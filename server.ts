@@ -150,6 +150,118 @@ let syncLogs = [
   }
 ];
 
+// In-memory mock DB for user profiles (auth) and active sessions
+let usersStore = [
+  {
+    id: "user-1",
+    name: "Administrador Principal",
+    email: "admin@empresa.com",
+    password: "admin123",
+    role: "admin",
+    createdBy: null as string | null,
+    createdAt: new Date().toISOString()
+  }
+];
+
+const sessions = new Map<string, string>(); // token -> userId
+
+function generateToken(): string {
+  return "tok_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function publicUser(u: (typeof usersStore)[number]) {
+  const { password, ...rest } = u;
+  return rest;
+}
+
+function getUserFromRequest(req: express.Request) {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  const userId = sessions.get(token);
+  if (!userId) return null;
+  return usersStore.find((u) => u.id === userId) || null;
+}
+
+function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const user = getUserFromRequest(req);
+  if (!user) {
+    return res.status(401).json({ error: "Sesión inválida o expirada. Inicia sesión nuevamente." });
+  }
+  if (user.role !== "admin") {
+    return res.status(403).json({ error: "Solo los perfiles de administrador pueden modificar el organigrama." });
+  }
+  next();
+}
+
+// --- AUTH ROUTES --- //
+
+app.post("/api/auth/login", (req, res) => {
+  const { email, password } = req.body || {};
+  const user = usersStore.find((u) => u.email === email && u.password === password);
+  if (!user) {
+    return res.status(401).json({ error: "Email o contraseña incorrectos" });
+  }
+  const token = generateToken();
+  sessions.set(token, user.id);
+  res.json({ success: true, token, user: publicUser(user) });
+});
+
+app.get("/api/auth/me", (req, res) => {
+  const user = getUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "No autenticado" });
+  res.json({ success: true, user: publicUser(user) });
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  sessions.delete(token);
+  res.json({ success: true });
+});
+
+// --- USER / PROFILE MANAGEMENT (admin only) --- //
+
+app.get("/api/v1/users", requireAdmin, (req, res) => {
+  res.json({ success: true, data: usersStore.map(publicUser) });
+});
+
+app.post("/api/v1/users", requireAdmin, (req, res) => {
+  const admin = getUserFromRequest(req)!;
+  const { name, email, password, role } = req.body || {};
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: "Nombre, email y contraseña son obligatorios" });
+  }
+  if (usersStore.some((u) => u.email === email)) {
+    return res.status(409).json({ error: "Ya existe un perfil con ese email" });
+  }
+  const newUser = {
+    id: "user-" + Date.now(),
+    name,
+    email,
+    password,
+    role: role === "admin" ? "admin" : "viewer",
+    createdBy: admin.id,
+    createdAt: new Date().toISOString()
+  };
+  usersStore.push(newUser);
+  res.json({ success: true, data: publicUser(newUser) });
+});
+
+app.delete("/api/v1/users/:id", requireAdmin, (req, res) => {
+  const admin = getUserFromRequest(req)!;
+  if (req.params.id === admin.id) {
+    return res.status(400).json({ error: "No puedes eliminar tu propio perfil" });
+  }
+  const target = usersStore.find((u) => u.id === req.params.id);
+  if (!target) return res.status(404).json({ error: "Perfil no encontrado" });
+  const remainingAdmins = usersStore.filter((u) => u.role === "admin" && u.id !== target.id);
+  if (target.role === "admin" && remainingAdmins.length === 0) {
+    return res.status(400).json({ error: "Debe existir al menos un perfil administrador" });
+  }
+  usersStore = usersStore.filter((u) => u.id !== req.params.id);
+  res.json({ success: true });
+});
+
 // --- REST API ROUTES --- //
 
 // Health check
@@ -176,7 +288,7 @@ app.get("/api/v1/nodes", (req, res) => {
 });
 
 // Sync / update nodes payload
-app.post("/api/v1/nodes/bulk-sync", (req, res) => {
+app.post("/api/v1/nodes/bulk-sync", requireAdmin, (req, res) => {
   const { nodes } = req.body;
   if (Array.isArray(nodes)) {
     orgNodesStore = nodes;
@@ -194,7 +306,7 @@ app.post("/api/v1/nodes/bulk-sync", (req, res) => {
 });
 
 // HR API Endpoint - External Systems Sync Endpoint
-app.post("/api/v1/hr/sync", (req, res) => {
+app.post("/api/v1/hr/sync", requireAdmin, (req, res) => {
   const authHeader = req.headers.authorization;
   const provider = req.body.provider || "Sistema de RRHH Externo";
   const incomingEmployees = req.body.employees || [];
@@ -276,7 +388,7 @@ app.get("/api/v1/integrations/keys", (req, res) => {
   res.json({ success: true, data: apiKeysStore });
 });
 
-app.post("/api/v1/integrations/keys", (req, res) => {
+app.post("/api/v1/integrations/keys", requireAdmin, (req, res) => {
   const { name, provider } = req.body;
   const newKey = {
     id: "key-" + Date.now(),

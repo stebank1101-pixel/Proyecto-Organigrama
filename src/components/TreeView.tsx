@@ -8,6 +8,7 @@ interface TreeViewProps {
   onDelete: (node: OrgNode) => void;
   onAddChild: (parent: OrgNode) => void;
   highlightedId?: string | null;
+  readOnly?: boolean;
 }
 
 function TreeBranch({
@@ -21,6 +22,7 @@ function TreeBranch({
   onDelete: (node: OrgNode) => void;
   onAddChild: (parent: OrgNode) => void;
   highlightedId?: string | null;
+  readOnly?: boolean;
 }) {
   const children = childrenByParent.get(node.id) || [];
   return (
@@ -32,6 +34,7 @@ function TreeBranch({
           onDelete={handlers.onDelete}
           onAddChild={handlers.onAddChild}
           highlighted={handlers.highlightedId === node.id}
+          readOnly={handlers.readOnly}
         />
       </div>
       {children.length > 0 && (
@@ -46,7 +49,7 @@ function TreeBranch({
 }
 
 export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeView(
-  { nodes, onEdit, onDelete, onAddChild, highlightedId },
+  { nodes, onEdit, onDelete, onAddChild, highlightedId, readOnly },
   ref
 ) {
   const { roots, childrenByParent } = useMemo(() => {
@@ -85,6 +88,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
             onDelete={onDelete}
             onAddChild={onAddChild}
             highlightedId={highlightedId}
+            readOnly={readOnly}
           />
         ))}
       </ul>

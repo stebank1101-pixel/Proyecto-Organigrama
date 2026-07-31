@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap");
 @import "tailwindcss";
 
 html,
@@ -8,11 +9,11 @@ body,
 
 body {
   margin: 0;
-  background-color: #020617;
+  background-color: #f8fafc;
 }
 
 * {
-  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+  scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
   scrollbar-width: thin;
 }
 
@@ -22,28 +23,28 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: rgba(148, 163, 184, 0.35);
+  background-color: rgba(100, 116, 139, 0.35);
   border-radius: 999px;
 }
 
 .input {
-  @apply w-full rounded-lg border border-white/10 bg-slate-950/70 px-2.5 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:border-sky-400 focus:outline-none;
+  @apply w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-200;
 }
 
 .select-sm {
-  @apply rounded-lg border border-white/10 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 focus:border-sky-400 focus:outline-none;
+  @apply rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-sky-400 focus:outline-none;
 }
 
 .btn-primary {
-  @apply flex items-center gap-1.5 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-medium text-white shadow transition hover:bg-sky-400;
+  @apply flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-sky-500;
 }
 
 .btn-secondary {
-  @apply flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-white/5;
+  @apply flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50;
 }
 
 .icon-btn {
-  @apply rounded-md p-1.5 text-slate-300 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40;
+  @apply rounded-md p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40;
 }
 
 /* Classic CSS-only hierarchical org chart connectors */
@@ -79,13 +80,13 @@ body {
   right: 50%;
   width: 50%;
   height: 32px;
-  border-top: 2px solid rgba(148, 163, 184, 0.35);
+  border-top: 2px solid rgba(100, 116, 139, 0.3);
 }
 
 .org-tree li::after {
   right: auto;
   left: 50%;
-  border-left: 2px solid rgba(148, 163, 184, 0.35);
+  border-left: 2px solid rgba(100, 116, 139, 0.3);
 }
 
 .org-tree > ul > li::before,
@@ -111,7 +112,7 @@ body {
 }
 
 .org-tree li:last-child::before {
-  border-right: 2px solid rgba(148, 163, 184, 0.35);
+  border-right: 2px solid rgba(100, 116, 139, 0.3);
   border-radius: 0 6px 0 0;
 }
 
@@ -126,5 +127,5 @@ body {
   left: 50%;
   width: 0;
   height: 32px;
-  border-left: 2px solid rgba(148, 163, 184, 0.35);
+  border-left: 2px solid rgba(100, 116, 139, 0.3);
 }

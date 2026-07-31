@@ -13,10 +13,11 @@ interface FreeViewProps {
   onAddChild: (parent: OrgNode) => void;
   onNodeMove: (id: string, x: number, y: number) => void;
   highlightedId?: string | null;
+  readOnly?: boolean;
 }
 
 export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeView(
-  { nodes, onEdit, onDelete, onAddChild, onNodeMove, highlightedId },
+  { nodes, onEdit, onDelete, onAddChild, onNodeMove, highlightedId, readOnly },
   forwardedRef
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -38,6 +39,7 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
   }, [nodes]);
 
   function handlePointerDown(e: React.PointerEvent, node: OrgNode) {
+    if (readOnly) return;
     const target = e.target as HTMLElement;
     if (target.closest("button")) return;
     const containerEl = containerRef.current;
@@ -106,7 +108,7 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
                 key={node.id}
                 d={`M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`}
                 fill="none"
-                stroke="rgba(148,163,184,0.35)"
+                stroke="rgba(100,116,139,0.35)"
                 strokeWidth={2}
               />
             );
@@ -116,7 +118,7 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
         {nodes.map((node) => (
           <div
             key={node.id}
-            className="absolute cursor-grab active:cursor-grabbing"
+            className={readOnly ? "absolute" : "absolute cursor-grab active:cursor-grabbing"}
             style={{ left: node.freeX, top: node.freeY, touchAction: "none" }}
             onPointerDown={(e) => handlePointerDown(e, node)}
           >
@@ -126,6 +128,7 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
               onDelete={onDelete}
               onAddChild={onAddChild}
               highlighted={highlightedId === node.id}
+              readOnly={readOnly}
             />
           </div>
         ))}

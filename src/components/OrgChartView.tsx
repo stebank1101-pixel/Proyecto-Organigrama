@@ -17,6 +17,7 @@ interface OrgChartViewProps {
   onSave: () => void;
   saving: boolean;
   dirty: boolean;
+  readOnly?: boolean;
 }
 
 function computeVisibleNodes(nodes: OrgNode[], sede: string, department: string, search: string): OrgNode[] {
@@ -46,7 +47,17 @@ function computeVisibleNodes(nodes: OrgNode[], sede: string, department: string,
   return nodes.filter((n) => visibleIds.has(n.id));
 }
 
-export function OrgChartView({ nodes, onAddNode, onUpdateNode, onDeleteNode, onMoveNode, onSave, saving, dirty }: OrgChartViewProps) {
+export function OrgChartView({
+  nodes,
+  onAddNode,
+  onUpdateNode,
+  onDeleteNode,
+  onMoveNode,
+  onSave,
+  saving,
+  dirty,
+  readOnly,
+}: OrgChartViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("tree");
   const [sedeFilter, setSedeFilter] = useState("all");
   const [deptFilter, setDeptFilter] = useState("all");
@@ -69,10 +80,12 @@ export function OrgChartView({ nodes, onAddNode, onUpdateNode, onDeleteNode, onM
   );
 
   function openCreate(parentId: string | null) {
+    if (readOnly) return;
     setModalState({ open: true, initial: null, parentId });
   }
 
   function openEdit(node: OrgNode) {
+    if (readOnly) return;
     setModalState({ open: true, initial: node, parentId: null });
   }
 
@@ -95,7 +108,7 @@ export function OrgChartView({ nodes, onAddNode, onUpdateNode, onDeleteNode, onM
     if (!node) return;
     setExporting(true);
     try {
-      const options = { backgroundColor: "#0f172a", pixelRatio: 2 };
+      const options = { backgroundColor: "#ffffff", pixelRatio: 2 };
       if (format === "png") {
         const dataUrl = await toPng(node, options);
         downloadUrl(dataUrl, "organigrama.png");
@@ -126,11 +139,11 @@ export function OrgChartView({ nodes, onAddNode, onUpdateNode, onDeleteNode, onM
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-slate-950/60 px-4 py-3">
-        <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-slate-900 p-1">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
+        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
           <button
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
-              viewMode === "tree" ? "bg-sky-500/20 text-sky-300" : "text-slate-400 hover:text-slate-200"
+              viewMode === "tree" ? "bg-white text-sky-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
             }`}
             onClick={() => setViewMode("tree")}
           >
@@ -138,7 +151,7 @@ export function OrgChartView({ nodes, onAddNode, onUpdateNode, onDeleteNode, onM
           </button>
           <button
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
-              viewMode === "free" ? "bg-sky-500/20 text-sky-300" : "text-slate-400 hover:text-slate-200"
+              viewMode === "free" ? "bg-white text-sky-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
             }`}
             onClick={() => setViewMode("free")}
           >
@@ -147,12 +160,12 @@ export function OrgChartView({ nodes, onAddNode, onUpdateNode, onDeleteNode, onM
         </div>
 
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nombre o cargo..."
-            className="w-56 rounded-lg border border-white/10 bg-slate-900 py-1.5 pl-8 pr-2 text-xs text-slate-200 placeholder:text-slate-500 focus:border-sky-400 focus:outline-none"
+            className="w-56 rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2 text-xs text-slate-700 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
           />
         </div>
 
@@ -175,10 +188,12 @@ export function OrgChartView({ nodes, onAddNode, onUpdateNode, onDeleteNode, onM
         </select>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <button onClick={() => openCreate(null)} className="btn-secondary">
-            <Plus className="h-3.5 w-3.5" /> Nuevo nodo
-          </button>
-          <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-slate-900 p-1">
+          {!readOnly && (
+            <button onClick={() => openCreate(null)} className="btn-secondary">
+              <Plus className="h-3.5 w-3.5" /> Nuevo nodo
+            </button>
+          )}
+          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
             <button disabled={exporting} onClick={() => exportAs("png")} className="icon-btn" title="Exportar PNG">
               <FileImage className="h-3.5 w-3.5" />
             </button>
@@ -189,15 +204,24 @@ export function OrgChartView({ nodes, onAddNode, onUpdateNode, onDeleteNode, onM
               <FileText className="h-3.5 w-3.5" />
             </button>
           </div>
-          <button onClick={onSave} disabled={saving || !dirty} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">
-            <Save className="h-3.5 w-3.5" /> {saving ? "Guardando..." : dirty ? "Guardar cambios" : "Sincronizado"}
-          </button>
+          {!readOnly && (
+            <button onClick={onSave} disabled={saving || !dirty} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">
+              <Save className="h-3.5 w-3.5" /> {saving ? "Guardando..." : dirty ? "Guardar cambios" : "Sincronizado"}
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,0.15)_1px,transparent_0)] bg-[length:22px_22px]">
+      <div className="min-h-0 flex-1 overflow-auto bg-white bg-[radial-gradient(circle_at_1px_1px,rgba(100,116,139,0.18)_1px,transparent_0)] bg-[length:22px_22px]">
         {viewMode === "tree" ? (
-          <TreeView ref={contentRef} nodes={visibleNodes} onEdit={openEdit} onDelete={setDeleteTarget} onAddChild={(p) => openCreate(p.id)} />
+          <TreeView
+            ref={contentRef}
+            nodes={visibleNodes}
+            onEdit={openEdit}
+            onDelete={setDeleteTarget}
+            onAddChild={(p) => openCreate(p.id)}
+            readOnly={readOnly}
+          />
         ) : (
           <FreeView
             ref={contentRef}
@@ -206,6 +230,7 @@ export function OrgChartView({ nodes, onAddNode, onUpdateNode, onDeleteNode, onM
             onDelete={setDeleteTarget}
             onAddChild={(p) => openCreate(p.id)}
             onNodeMove={onMoveNode}
+            readOnly={readOnly}
           />
         )}
       </div>

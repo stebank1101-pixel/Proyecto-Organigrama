@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import { X } from "lucide-react";
-import { ICON_NAMES } from "../lib/icons";
+import { useEffect, useRef, useState } from "react";
+import { Upload, X } from "lucide-react";
+import { ICON_NAMES, OrgIcon } from "../lib/icons";
+import { CARD_COLOR_PRESETS, FONT_OPTIONS } from "../types";
 import type { OrgNode, RoleType } from "../types";
 
 interface NodeModalProps {
@@ -50,6 +51,7 @@ function getDescendantIds(nodeId: string, nodes: OrgNode[]): Set<string> {
 
 export function NodeModal({ open, initial, defaultParentId, nodes, onClose, onSave }: NodeModalProps) {
   const [form, setForm] = useState<OrgNode>(() => initial ?? emptyNode(defaultParentId));
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -73,12 +75,19 @@ export function NodeModal({ open, initial, defaultParentId, nodes, onClose, onSa
     onSave({ ...form, id });
   }
 
+  function handleIconFile(file: File | undefined) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => update("customIcon", reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-100">{initial ? "Editar colaborador" : "Nuevo colaborador"}</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-white/5 hover:text-white">
+          <h2 className="text-lg font-semibold text-slate-900">{initial ? "Editar colaborador" : "Nuevo colaborador"}</h2>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-900">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -133,6 +142,95 @@ export function NodeModal({ open, initial, defaultParentId, nodes, onClose, onSa
                 ))}
               </select>
             </Field>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="mb-2 text-xs font-semibold text-slate-700">Apariencia del recuadro</p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Color de fondo">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-white p-0.5"
+                    value={form.cardColor || "#ffffff"}
+                    onChange={(e) => update("cardColor", e.target.value)}
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {CARD_COLOR_PRESETS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => update("cardColor", color)}
+                        className="h-5 w-5 rounded-full border border-slate-300"
+                        style={{ backgroundColor: color }}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </Field>
+              <Field label="Color de texto">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-white p-0.5"
+                    value={form.textColor || "#0f172a"}
+                    onChange={(e) => update("textColor", e.target.value)}
+                  />
+                  <button type="button" className="text-[11px] text-sky-600 hover:underline" onClick={() => update("textColor", "")}>
+                    Restablecer
+                  </button>
+                </div>
+              </Field>
+            </div>
+
+            <div className="mt-3">
+              <Field label="Tipo de letra">
+                <select className="input" value={form.fontFamily || ""} onChange={(e) => update("fontFamily", e.target.value)}>
+                  {FONT_OPTIONS.map((f) => (
+                    <option key={f.label} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+
+            <div className="mt-3">
+              <Field label="Icono / logo corporativo">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white">
+                    {form.customIcon ? (
+                      <img src={form.customIcon} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <OrgIcon name={form.iconName} className="h-4 w-4 text-slate-400" />
+                    )}
+                  </div>
+                  <input
+                    className="input flex-1"
+                    placeholder="URL de imagen (https://...)"
+                    value={form.customIcon || ""}
+                    onChange={(e) => update("customIcon", e.target.value)}
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleIconFile(e.target.files?.[0])}
+                  />
+                  <button type="button" className="icon-btn border border-slate-200" title="Subir imagen" onClick={() => fileInputRef.current?.click()}>
+                    <Upload className="h-3.5 w-3.5" />
+                  </button>
+                  {form.customIcon && (
+                    <button type="button" className="text-[11px] text-rose-500 hover:underline" onClick={() => update("customIcon", "")}>
+                      Quitar
+                    </button>
+                  )}
+                </div>
+              </Field>
+            </div>
           </div>
 
           <Field label="Reporta a">
@@ -195,8 +293,8 @@ export function NodeModal({ open, initial, defaultParentId, nodes, onClose, onSa
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
-    <label className="block text-xs font-medium text-slate-400">
-      {label} {required && <span className="text-rose-400">*</span>}
+    <label className="block text-xs font-medium text-slate-600">
+      {label} {required && <span className="text-rose-500">*</span>}
       <div className="mt-1">{children}</div>
     </label>
   );

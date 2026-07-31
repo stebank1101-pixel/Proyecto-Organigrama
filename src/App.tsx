@@ -2,9 +2,12 @@ import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AiGeneratorView } from "./components/AiGeneratorView";
 import { HrIntegrationView } from "./components/HrIntegrationView";
+import { LoginView } from "./components/LoginView";
 import { NavBar } from "./components/NavBar";
 import { OrgChartView } from "./components/OrgChartView";
+import { ProfilesView } from "./components/ProfilesView";
 import { bulkSyncNodes, fetchNodes } from "./lib/api";
+import { useAuth } from "./lib/auth";
 import type { OrgNode, TabId } from "./types";
 
 interface Toast {
@@ -14,6 +17,7 @@ interface Toast {
 }
 
 export default function App() {
+  const { user, loading: authLoading, isAdmin } = useAuth();
   const [nodes, setNodes] = useState<OrgNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -44,8 +48,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadNodes();
-  }, [loadNodes]);
+    if (user) loadNodes();
+  }, [user, loadNodes]);
+
+  useEffect(() => {
+    if (!isAdmin && activeTab === "profiles") setActiveTab("chart");
+  }, [isAdmin, activeTab]);
 
   function handleAddNode(node: OrgNode) {
     setNodes((prev) => [...prev, node]);
@@ -104,18 +112,30 @@ export default function App() {
     pushToast("Organigrama actualizado desde RRHH");
   }
 
+  if (authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center gap-2 bg-slate-50 text-slate-500">
+        <Loader2 className="h-5 w-5 animate-spin" /> Cargando sesión...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginView />;
+  }
+
   return (
-    <div className="flex h-screen flex-col bg-slate-950 text-slate-100">
+    <div className="flex h-screen flex-col bg-slate-50 text-slate-900">
       <NavBar active={activeTab} onChange={setActiveTab} nodeCount={nodes.length} />
 
       <main className="min-h-0 flex-1">
         {loading ? (
-          <div className="flex h-full items-center justify-center gap-2 text-slate-400">
+          <div className="flex h-full items-center justify-center gap-2 text-slate-500">
             <Loader2 className="h-5 w-5 animate-spin" /> Cargando organigrama...
           </div>
         ) : loadError ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-400">
-            <AlertTriangle className="h-6 w-6 text-rose-400" />
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-500">
+            <AlertTriangle className="h-6 w-6 text-rose-500" />
             <p className="text-sm">{loadError}</p>
             <button className="btn-secondary" onClick={() => loadNodes()}>
               Reintentar
@@ -131,11 +151,14 @@ export default function App() {
             onSave={handleSave}
             saving={saving}
             dirty={dirty}
+            readOnly={!isAdmin}
           />
         ) : activeTab === "ai" ? (
-          <AiGeneratorView onApply={handleApplyAiNodes} />
+          <AiGeneratorView onApply={handleApplyAiNodes} readOnly={!isAdmin} />
+        ) : activeTab === "hr" ? (
+          <HrIntegrationView onSynced={handleHrSynced} readOnly={!isAdmin} />
         ) : (
-          <HrIntegrationView onSynced={handleHrSynced} />
+          <ProfilesView />
         )}
       </main>
 
@@ -143,8 +166,8 @@ export default function App() {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-center gap-2 rounded-lg border px-3 py-2 text-xs shadow-lg backdrop-blur ${
-              t.tone === "success" ? "border-emerald-500/30 bg-emerald-950/80 text-emerald-200" : "border-rose-500/30 bg-rose-950/80 text-rose-200"
+            className={`pointer-events-auto flex items-center gap-2 rounded-lg border px-3 py-2 text-xs shadow-lg ${
+              t.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"
             }`}
           >
             {t.tone === "success" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}

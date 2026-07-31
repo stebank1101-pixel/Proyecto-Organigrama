@@ -1,8 +1,24 @@
-import type { ApiKeyRecord, OrgNode, SyncLogRecord } from "../types";
+import type { ApiKeyRecord, OrgNode, SyncLogRecord, UserProfile } from "../types";
+
+const TOKEN_STORAGE_KEY = "orgcraft.auth.token";
+
+let authToken: string | null = localStorage.getItem(TOKEN_STORAGE_KEY);
+
+export function setAuthToken(token: string | null) {
+  authToken = token;
+  if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  else localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
+export function getAuthToken() {
+  return authToken;
+}
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
   const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
+    headers,
     ...options,
   });
   const body = await res.json().catch(() => ({}));
@@ -10,6 +26,41 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     throw new Error(body?.error || `Error ${res.status} al llamar ${url}`);
   }
   return body as T;
+}
+
+export function login(email: string, password: string): Promise<{ success: boolean; token: string; user: UserProfile }> {
+  return request("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export function fetchMe(): Promise<{ success: boolean; user: UserProfile }> {
+  return request("/api/auth/me");
+}
+
+export function logout(): Promise<{ success: boolean }> {
+  return request("/api/auth/logout", { method: "POST" });
+}
+
+export function fetchUsers(): Promise<{ data: UserProfile[] }> {
+  return request("/api/v1/users");
+}
+
+export function createUserProfile(payload: {
+  name: string;
+  email: string;
+  password: string;
+  role: "admin" | "viewer";
+}): Promise<{ success: boolean; data: UserProfile }> {
+  return request("/api/v1/users", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteUserProfile(id: string): Promise<{ success: boolean }> {
+  return request(`/api/v1/users/${id}`, { method: "DELETE" });
 }
 
 export function fetchNodes(filters?: { sede?: string; department?: string }): Promise<{ data: OrgNode[] }> {
