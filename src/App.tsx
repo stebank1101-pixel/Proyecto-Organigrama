@@ -17,7 +17,7 @@ interface Toast {
 }
 
 export default function App() {
-  const { user, loading: authLoading, isAdmin } = useAuth();
+  const { user, loading: authLoading, isAdmin, isGuest } = useAuth();
   const [nodes, setNodes] = useState<OrgNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -48,12 +48,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (user) loadNodes();
-  }, [user, loadNodes]);
+    if (user || isGuest) loadNodes();
+  }, [user, isGuest, loadNodes]);
 
   useEffect(() => {
     if (!isAdmin && activeTab === "profiles") setActiveTab("chart");
-  }, [isAdmin, activeTab]);
+    if (isGuest && (activeTab === "ai" || activeTab === "hr")) setActiveTab("chart");
+  }, [isAdmin, isGuest, activeTab]);
 
   function handleAddNode(node: OrgNode) {
     setNodes((prev) => [...prev, node]);
@@ -120,7 +121,7 @@ export default function App() {
     );
   }
 
-  if (!user) {
+  if (!user && !isGuest) {
     return <LoginView />;
   }
 

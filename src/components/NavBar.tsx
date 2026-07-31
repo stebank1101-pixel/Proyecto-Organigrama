@@ -1,11 +1,11 @@
-import { LogOut, Network, Plug, Shield, Sparkles, User, Users } from "lucide-react";
+import { Eye, LogIn, LogOut, Network, Plug, Shield, Sparkles, User, Users } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import type { TabId } from "../types";
 
-const TABS: { id: TabId; label: string; icon: typeof Network; adminOnly?: boolean }[] = [
+const TABS: { id: TabId; label: string; icon: typeof Network; adminOnly?: boolean; hideForGuest?: boolean }[] = [
   { id: "chart", label: "Organigrama", icon: Network },
-  { id: "ai", label: "Generador IA", icon: Sparkles },
-  { id: "hr", label: "Integración RRHH", icon: Plug },
+  { id: "ai", label: "Generador IA", icon: Sparkles, hideForGuest: true },
+  { id: "hr", label: "Integración RRHH", icon: Plug, hideForGuest: true },
   { id: "profiles", label: "Perfiles", icon: Users, adminOnly: true },
 ];
 
@@ -16,7 +16,7 @@ interface NavBarProps {
 }
 
 export function NavBar({ active, onChange, nodeCount }: NavBarProps) {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, isGuest, logout, exitGuestMode } = useAuth();
 
   return (
     <header className="flex items-center gap-4 border-b border-slate-200 bg-white px-4 py-2.5 shadow-sm">
@@ -31,7 +31,7 @@ export function NavBar({ active, onChange, nodeCount }: NavBarProps) {
       </div>
 
       <nav className="flex items-center gap-1">
-        {TABS.filter((t) => !t.adminOnly || isAdmin).map(({ id, label, icon: Icon }) => (
+        {TABS.filter((t) => (!t.adminOnly || isAdmin) && (!t.hideForGuest || !isGuest)).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => onChange(id)}
@@ -62,6 +62,23 @@ export function NavBar({ active, onChange, nodeCount }: NavBarProps) {
           </div>
           <button onClick={logout} className="icon-btn text-slate-500" title="Cerrar sesión">
             <LogOut className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {!user && isGuest && (
+        <div className="ml-auto flex items-center gap-3">
+          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-100 text-sky-600">
+              <Eye className="h-3 w-3" />
+            </div>
+            <div className="leading-tight">
+              <p className="text-[11px] font-medium text-slate-800">Invitado</p>
+              <p className="text-[10px] text-slate-500">Solo lectura</p>
+            </div>
+          </div>
+          <button onClick={exitGuestMode} className="icon-btn text-slate-500" title="Iniciar sesión">
+            <LogIn className="h-4 w-4" />
           </button>
         </div>
       )}

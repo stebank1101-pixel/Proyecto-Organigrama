@@ -1,6 +1,6 @@
 import { toPng, toSvg } from "html-to-image";
 import { jsPDF } from "jspdf";
-import { Download, FileImage, FileText, ListTree, Network, Plus, Save, Search } from "lucide-react";
+import { Building2, Download, FileImage, FileText, ListTree, Network, Plus, Save, Search } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import type { OrgNode, ViewMode } from "../types";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -73,6 +73,14 @@ export function OrgChartView({
 
   const sedes = useMemo(() => Array.from(new Set(nodes.map((n) => n.sede).filter(Boolean))).sort(), [nodes]);
   const departments = useMemo(() => Array.from(new Set(nodes.map((n) => n.department).filter(Boolean))).sort(), [nodes]);
+  const sedeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const n of nodes) {
+      if (!n.sede) continue;
+      counts.set(n.sede, (counts.get(n.sede) || 0) + 1);
+    }
+    return counts;
+  }, [nodes]);
 
   const visibleNodes = useMemo(
     () => computeVisibleNodes(nodes, sedeFilter, deptFilter, search),
@@ -211,6 +219,37 @@ export function OrgChartView({
           )}
         </div>
       </div>
+
+      {sedes.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-200 bg-slate-50 px-4 py-2">
+          <span className="flex flex-shrink-0 items-center gap-1 text-[11px] font-medium text-slate-500">
+            <Building2 className="h-3.5 w-3.5" /> Centros de trabajo:
+          </span>
+          <button
+            onClick={() => setSedeFilter("all")}
+            className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+              sedeFilter === "all"
+                ? "border-slate-900 bg-slate-900 text-white"
+                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+            }`}
+          >
+            Todos ({nodes.length})
+          </button>
+          {sedes.map((s) => (
+            <button
+              key={s}
+              onClick={() => setSedeFilter(s)}
+              className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                sedeFilter === s
+                  ? "border-sky-600 bg-sky-600 text-white"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-sky-300"
+              }`}
+            >
+              {s} ({sedeCounts.get(s) ?? 0})
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-auto bg-white bg-[radial-gradient(circle_at_1px_1px,rgba(100,116,139,0.18)_1px,transparent_0)] bg-[length:22px_22px]">
         {viewMode === "tree" ? (

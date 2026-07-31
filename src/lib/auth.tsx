@@ -2,12 +2,17 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { fetchMe, getAuthToken, login as apiLogin, logout as apiLogout, setAuthToken } from "./api";
 import type { UserProfile } from "../types";
 
+const GUEST_STORAGE_KEY = "orgcraft.guestMode";
+
 interface AuthContextValue {
   user: UserProfile | null;
   loading: boolean;
   isAdmin: boolean;
+  isGuest: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  enterGuestMode: () => void;
+  exitGuestMode: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -15,6 +20,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isGuest, setIsGuest] = useState(() => localStorage.getItem(GUEST_STORAGE_KEY) === "1");
 
   useEffect(() => {
     async function restoreSession() {
@@ -38,6 +44,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await apiLogin(email, password);
     setAuthToken(res.token);
     setUser(res.user);
+    localStorage.removeItem(GUEST_STORAGE_KEY);
+    setIsGuest(false);
   }, []);
 
   const logout = useCallback(() => {
@@ -46,9 +54,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const enterGuestMode = useCallback(() => {
+    localStorage.setItem(GUEST_STORAGE_KEY, "1");
+    setIsGuest(true);
+  }, []);
+
+  const exitGuestMode = useCallback(() => {
+    localStorage.removeItem(GUEST_STORAGE_KEY);
+    setIsGuest(false);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, isAdmin: user?.role === "admin", login, logout }),
-    [user, loading, login, logout]
+    () => ({ user, loading, isAdmin: user?.role === "admin", isGuest, login, logout, enterGuestMode, exitGuestMode }),
+    [user, loading, isGuest, login, logout, enterGuestMode, exitGuestMode]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
