@@ -1,0 +1,6 @@
+{
+  "name": "OrgCraft Pro - Gestor de Organigramas Corporativos",
+  "description": "Plataforma empresarial para diseño intuitivo de organigramas corporativos, vista libre y por sedes, sincronización en tiempo real, exportación en PDF/SVG a gran escala e integración con API de RRHH.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
