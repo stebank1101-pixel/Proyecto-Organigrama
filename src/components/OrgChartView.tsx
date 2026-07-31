@@ -1,7 +1,7 @@
 import { toPng, toSvg } from "html-to-image";
 import { jsPDF } from "jspdf";
 import { Building2, Download, FileImage, FileText, ListTree, Network, Plus, Save, Search } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { OrgNode, ViewMode } from "../types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { FreeView } from "./FreeView";
@@ -69,7 +69,46 @@ export function OrgChartView({
   });
   const [deleteTarget, setDeleteTarget] = useState<OrgNode | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const panState = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
+
+  useEffect(() => {
+    function handleMouseMove(e: MouseEvent) {
+      const pan = panState.current;
+      const container = scrollRef.current;
+      if (!pan || !container) return;
+      container.scrollLeft = pan.scrollLeft - (e.clientX - pan.startX);
+      container.scrollTop = pan.scrollTop - (e.clientY - pan.startY);
+    }
+    function handleMouseUp() {
+      if (panState.current) {
+        panState.current = null;
+        setIsPanning(false);
+        document.body.style.userSelect = "";
+      }
+    }
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.userSelect = "";
+    };
+  }, []);
+
+  function handleCanvasMouseDown(e: React.MouseEvent) {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-card]") || target.closest("button") || target.closest("input") || target.closest("select")) return;
+    const container = scrollRef.current;
+    if (!container) return;
+    e.preventDefault();
+    document.body.style.userSelect = "none";
+    panState.current = { startX: e.clientX, startY: e.clientY, scrollLeft: container.scrollLeft, scrollTop: container.scrollTop };
+    setIsPanning(true);
+  }
 
   const sedes = useMemo(() => Array.from(new Set(nodes.map((n) => n.sede).filter(Boolean))).sort(), [nodes]);
   const departments = useMemo(() => Array.from(new Set(nodes.map((n) => n.department).filter(Boolean))).sort(), [nodes]);
@@ -251,7 +290,13 @@ export function OrgChartView({
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto bg-white bg-[radial-gradient(circle_at_1px_1px,rgba(100,116,139,0.18)_1px,transparent_0)] bg-[length:22px_22px]">
+      <div
+        ref={scrollRef}
+        onMouseDown={handleCanvasMouseDown}
+        className={`min-h-0 flex-1 overflow-auto bg-white bg-[radial-gradient(circle_at_1px_1px,rgba(100,116,139,0.18)_1px,transparent_0)] bg-[length:22px_22px] ${
+          isPanning ? "cursor-grabbing select-none" : "cursor-grab"
+        }`}
+      >
         {viewMode === "tree" ? (
           <TreeView
             ref={contentRef}

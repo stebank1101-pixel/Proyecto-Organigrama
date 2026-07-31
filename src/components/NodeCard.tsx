@@ -54,6 +54,7 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, dragHandleProps, 
   return (
     <div
       {...dragHandleProps}
+      data-card="true"
       style={cardStyle}
       className={`group relative w-[240px] select-none rounded-xl border bg-white p-3 shadow-md transition-shadow ${style.ring} ${
         highlighted ? "ring-2 shadow-[0_0_0_3px_rgba(56,189,248,0.25)]" : "ring-1"
