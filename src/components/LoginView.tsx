@@ -1,5 +1,6 @@
-import { AlertTriangle, Eye, LogIn, Network, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Eye, LogIn, ShieldCheck } from "lucide-react";
 import { useState } from "react";
+import checLogo from "../assets/chec-logo.jpg";
 import { useAuth } from "../lib/auth";
 
 export function LoginView() {
@@ -27,9 +28,7 @@ export function LoginView() {
     <div className="flex h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-lg">
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow">
-            <Network className="h-5 w-5" />
-          </div>
+          <img src={checLogo} alt="Logo CHEC" className="h-16 w-auto" />
           <h1 className="rounded-full bg-sky-50 px-4 py-1.5 text-base font-bold uppercase text-sky-700">ORGANIGRAMA CHEC-COLOMBIA</h1>
         </div>
 

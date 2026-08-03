@@ -335,7 +335,7 @@ export function OrgChartView({
                 : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
             }`}
           >
-            Todos ({nodes.length})
+            Todos
           </button>
           {allSedes.map((s) => (
             <button
@@ -347,7 +347,7 @@ export function OrgChartView({
                   : "border-slate-200 bg-white text-slate-600 hover:border-sky-300"
               }`}
             >
-              {s} ({sedeCounts.get(s) ?? 0})
+              {s}
             </button>
           ))}
           {!readOnly && (
