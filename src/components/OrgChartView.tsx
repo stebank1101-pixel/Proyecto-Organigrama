@@ -1,12 +1,16 @@
 import { toPng, toSvg } from "html-to-image";
 import { jsPDF } from "jspdf";
 import { Building2, Download, FileImage, FileText, ListTree, Network, Plus, Save, Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { OrgNode, ViewMode } from "../types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { FreeView } from "./FreeView";
 import { NodeModal } from "./NodeModal";
 import { TreeView } from "./TreeView";
+
+// Extra empty margin around the chart so there's always room to drag-pan in every
+// direction, even when the chart itself is smaller than the viewport.
+const PAN_PADDING = 400;
 
 interface OrgChartViewProps {
   nodes: OrgNode[];
@@ -73,6 +77,13 @@ export function OrgChartView({
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const panState = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
+    container.scrollTop = Math.max(0, PAN_PADDING - 24);
+  }, [viewMode, sedeFilter, deptFilter, search]);
 
   useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
@@ -297,26 +308,28 @@ export function OrgChartView({
           isPanning ? "cursor-grabbing select-none" : "cursor-grab"
         }`}
       >
-        {viewMode === "tree" ? (
-          <TreeView
-            ref={contentRef}
-            nodes={visibleNodes}
-            onEdit={openEdit}
-            onDelete={setDeleteTarget}
-            onAddChild={(p) => openCreate(p.id)}
-            readOnly={readOnly}
-          />
-        ) : (
-          <FreeView
-            ref={contentRef}
-            nodes={visibleNodes}
-            onEdit={openEdit}
-            onDelete={setDeleteTarget}
-            onAddChild={(p) => openCreate(p.id)}
-            onNodeMove={onMoveNode}
-            readOnly={readOnly}
-          />
-        )}
+        <div style={{ padding: PAN_PADDING }} className="inline-block min-w-full">
+          {viewMode === "tree" ? (
+            <TreeView
+              ref={contentRef}
+              nodes={visibleNodes}
+              onEdit={openEdit}
+              onDelete={setDeleteTarget}
+              onAddChild={(p) => openCreate(p.id)}
+              readOnly={readOnly}
+            />
+          ) : (
+            <FreeView
+              ref={contentRef}
+              nodes={visibleNodes}
+              onEdit={openEdit}
+              onDelete={setDeleteTarget}
+              onAddChild={(p) => openCreate(p.id)}
+              onNodeMove={onMoveNode}
+              readOnly={readOnly}
+            />
+          )}
+        </div>
       </div>
 
       <NodeModal
