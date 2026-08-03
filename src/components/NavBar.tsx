@@ -25,7 +25,7 @@ export function NavBar({ active, onChange, nodeCount }: NavBarProps) {
           <Network className="h-4 w-4" />
         </div>
         <div>
-          <p className="text-sm font-semibold leading-tight text-slate-900">OrgCraft Pro</p>
+          <p className="text-sm font-semibold leading-tight text-slate-900">Organigrama CHEC</p>
           <p className="text-[10px] leading-tight text-slate-500">{nodeCount} colaboradores</p>
         </div>
       </div>
