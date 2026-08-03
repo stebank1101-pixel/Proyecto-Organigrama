@@ -459,6 +459,7 @@ ASEGÚRATE de que el primer nodo sea el CEO/Director General con parentId: null,
         return {
           ...node,
           avatar: node.avatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
+          assignees: node.assignees || [],
           freeX: 350 + (idx % 3) * 260,
           freeY: 80 + Math.floor(idx / 3) * 180,
           status: "active"

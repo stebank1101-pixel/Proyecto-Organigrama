@@ -7,10 +7,17 @@ export interface OrgMetrics {
   budget: string;
 }
 
+export interface Assignee {
+  id: string;
+  name: string;
+  avatar: string;
+}
+
 export interface OrgNode {
   id: string;
   name: string;
   title: string;
+  assignees: Assignee[];
   department: string;
   sede: string;
   email: string;

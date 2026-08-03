@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Upload, X } from "lucide-react";
+import { Plus, Trash2, Upload, X } from "lucide-react";
 import { ICON_NAMES, OrgIcon } from "../lib/icons";
 import { CARD_COLOR_PRESETS, FONT_OPTIONS } from "../types";
-import type { OrgNode, RoleType } from "../types";
+import type { Assignee, OrgNode, RoleType } from "../types";
+
+const DEFAULT_ASSIGNEE_AVATAR = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80";
 
 interface NodeModalProps {
   open: boolean;
@@ -19,6 +21,7 @@ function emptyNode(defaultParentId: string | null): OrgNode {
     id: "",
     name: "",
     title: "",
+    assignees: [],
     department: "",
     sede: "",
     email: "",
@@ -71,7 +74,7 @@ export function NodeModal({ open, initial, defaultParentId, nodes, sedeOptions, 
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim() || !form.title.trim()) return;
+    if (!form.title.trim()) return;
     const id = form.id || `node-${Date.now()}`;
     onSave({ ...form, id });
   }
@@ -83,11 +86,27 @@ export function NodeModal({ open, initial, defaultParentId, nodes, sedeOptions, 
     reader.readAsDataURL(file);
   }
 
+  function addAssignee() {
+    const assignee: Assignee = { id: `assignee-${Date.now()}`, name: "", avatar: DEFAULT_ASSIGNEE_AVATAR };
+    update("assignees", [...(form.assignees ?? []), assignee]);
+  }
+
+  function updateAssignee(id: string, patch: Partial<Assignee>) {
+    update(
+      "assignees",
+      (form.assignees ?? []).map((a) => (a.id === id ? { ...a, ...patch } : a))
+    );
+  }
+
+  function removeAssignee(id: string) {
+    update("assignees", (form.assignees ?? []).filter((a) => a.id !== id));
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">{initial ? "Editar colaborador" : "Nuevo colaborador"}</h2>
+          <h2 className="text-lg font-semibold text-slate-900">{initial ? "Editar cargo" : "Nuevo cargo"}</h2>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-900">
             <X className="h-5 w-5" />
           </button>
@@ -95,11 +114,16 @@ export function NodeModal({ open, initial, defaultParentId, nodes, sedeOptions, 
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Nombre completo" required>
-              <input className="input" value={form.name} onChange={(e) => update("name", e.target.value)} required />
-            </Field>
             <Field label="Cargo" required>
-              <input className="input" value={form.title} onChange={(e) => update("title", e.target.value)} required />
+              <input className="input" value={form.title} onChange={(e) => update("title", e.target.value)} required autoFocus />
+            </Field>
+            <Field label="Nombre completo">
+              <input
+                className="input"
+                placeholder="Vacante"
+                value={form.name}
+                onChange={(e) => update("name", e.target.value)}
+              />
             </Field>
           </div>
 
@@ -244,6 +268,47 @@ export function NodeModal({ open, initial, defaultParentId, nodes, sedeOptions, 
             </div>
           </div>
 
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-semibold text-slate-700">Personas asignadas al cargo</p>
+              <button type="button" onClick={addAssignee} className="flex items-center gap-1 text-[11px] font-medium text-sky-600 hover:underline">
+                <Plus className="h-3 w-3" /> Agregar persona
+              </button>
+            </div>
+
+            {(form.assignees ?? []).length === 0 ? (
+              <p className="text-[11px] text-slate-400">Sin personas asignadas. El cargo aparecerá como vacante.</p>
+            ) : (
+              <div className="space-y-2">
+                {(form.assignees ?? []).map((a) => (
+                  <div key={a.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2">
+                    <img src={a.avatar || DEFAULT_ASSIGNEE_AVATAR} alt="" className="h-8 w-8 flex-shrink-0 rounded-full border border-slate-200 object-cover" />
+                    <input
+                      className="input flex-1"
+                      placeholder="Nombre de la persona"
+                      value={a.name}
+                      onChange={(e) => updateAssignee(a.id, { name: e.target.value })}
+                    />
+                    <input
+                      className="input flex-1"
+                      placeholder="URL de avatar"
+                      value={a.avatar}
+                      onChange={(e) => updateAssignee(a.id, { avatar: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeAssignee(a.id)}
+                      className="icon-btn flex-shrink-0 border border-slate-200 text-rose-500 hover:bg-rose-50"
+                      title="Quitar persona"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <Field label="Reporta a">
             <select
               className="input"
@@ -253,7 +318,7 @@ export function NodeModal({ open, initial, defaultParentId, nodes, sedeOptions, 
               <option value="">— Sin superior (raíz) —</option>
               {parentOptions.map((n) => (
                 <option key={n.id} value={n.id}>
-                  {n.name} · {n.title}
+                  {n.name ? `${n.name} · ${n.title}` : n.title}
                 </option>
               ))}
             </select>

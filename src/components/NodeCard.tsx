@@ -79,22 +79,40 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, dragHandleProps, 
 
       <div className="flex items-start gap-2.5 pt-1">
         <img
-          src={node.avatar}
-          alt={node.name}
+          src={node.avatar || "https://api.dicebear.com/9.x/initials/svg?seed=" + encodeURIComponent(node.title || "?")}
+          alt={node.name || node.title}
           className="h-11 w-11 flex-shrink-0 rounded-full border border-slate-200 object-cover"
           onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src = "https://api.dicebear.com/9.x/initials/svg?seed=" + encodeURIComponent(node.name);
+            (e.currentTarget as HTMLImageElement).src = "https://api.dicebear.com/9.x/initials/svg?seed=" + encodeURIComponent(node.name || node.title || "?");
           }}
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-900" style={textStyle} title={node.name}>
-            {node.name}
-          </p>
-          <p className="truncate text-xs text-slate-500" style={mutedTextStyle} title={node.title}>
+          <p className="truncate text-sm font-semibold text-slate-900" style={textStyle} title={node.title}>
             {node.title}
+          </p>
+          <p className="truncate text-xs text-slate-500" style={mutedTextStyle} title={node.name || "Vacante"}>
+            {node.name || "Vacante"}
           </p>
         </div>
       </div>
+
+      {node.assignees && node.assignees.length > 0 && (
+        <div className="mt-2 flex items-center gap-1" title={node.assignees.map((a) => a.name).filter(Boolean).join(", ")}>
+          <div className="flex -space-x-2">
+            {node.assignees.slice(0, 4).map((a) => (
+              <img
+                key={a.id}
+                src={a.avatar || "https://api.dicebear.com/9.x/initials/svg?seed=" + encodeURIComponent(a.name || "?")}
+                alt={a.name}
+                className="h-5 w-5 rounded-full border-2 border-white object-cover"
+              />
+            ))}
+          </div>
+          <span className="text-[10px] text-slate-400" style={mutedTextStyle}>
+            {node.assignees.length} {node.assignees.length === 1 ? "persona asignada" : "personas asignadas"}
+          </span>
+        </div>
+      )}
 
       <div className="mt-2 flex flex-wrap items-center gap-1">
         <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${style.badge}`}>{ROLE_LABEL[node.roleType]}</span>

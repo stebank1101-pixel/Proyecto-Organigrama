@@ -47,7 +47,8 @@ function computeVisibleNodes(nodes: OrgNode[], sede: string, department: string,
     (!term ||
       n.name.toLowerCase().includes(term) ||
       n.title.toLowerCase().includes(term) ||
-      n.department.toLowerCase().includes(term));
+      n.department.toLowerCase().includes(term) ||
+      (n.assignees ?? []).some((a) => a.name.toLowerCase().includes(term)));
 
   if (sede === "all" && department === "all" && !term) return nodes;
 
@@ -405,10 +406,10 @@ export function OrgChartView({
 
       <ConfirmDialog
         open={!!deleteTarget}
-        title="Eliminar colaborador"
+        title="Eliminar cargo"
         description={
           deleteTarget
-            ? `¿Eliminar a "${deleteTarget.name}"? Sus reportes directos se reasignarán automáticamente a su superior.`
+            ? `¿Eliminar el cargo "${deleteTarget.title}"? Sus reportes directos se reasignarán automáticamente a su superior.`
             : ""
         }
         confirmLabel="Eliminar"
