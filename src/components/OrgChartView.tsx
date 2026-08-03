@@ -2,7 +2,14 @@ import { toPng, toSvg } from "html-to-image";
 import { jsPDF } from "jspdf";
 import { Building2, Download, FileImage, FileText, ListTree, Network, Plus, Save, Search, Settings } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { OrgNode, ViewMode } from "../types";
+import {
+  createWorkCenterApi,
+  deleteWorkCenterApi,
+  fetchWorkCenters,
+  renameWorkCenterApi,
+  updateWorkCenterProfileApi,
+} from "../lib/api";
+import type { OrgNode, ViewMode, WorkCenter } from "../types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { FreeView } from "./FreeView";
 import { NodeModal } from "./NodeModal";
@@ -12,20 +19,6 @@ import { WorkCenterManagerModal } from "./WorkCenterManagerModal";
 // Extra empty margin around the chart so there's always room to drag-pan in every
 // direction, even when the chart itself is smaller than the viewport.
 const PAN_PADDING = 400;
-
-// Work centers created without any employee yet aren't backed by a node, so they're
-// tracked here and kept alongside whatever sedes are actually in use on nodes.
-const EXTRA_CENTERS_KEY = "orgcraft.extraWorkCenters";
-
-function loadExtraCenters(): string[] {
-  try {
-    const raw = localStorage.getItem(EXTRA_CENTERS_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string") : [];
-  } catch {
-    return [];
-  }
-}
 
 interface OrgChartViewProps {
   nodes: OrgNode[];
@@ -82,15 +75,21 @@ export function OrgChartView({
   const [sedeFilter, setSedeFilter] = useState("all");
   const [deptFilter, setDeptFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [modalState, setModalState] = useState<{ open: boolean; initial: OrgNode | null; parentId: string | null }>({
+  const [modalState, setModalState] = useState<{
+    open: boolean;
+    initial: OrgNode | null;
+    parentId: string | null;
+    defaultSede?: string;
+  }>({
     open: false,
     initial: null,
     parentId: null,
   });
   const [deleteTarget, setDeleteTarget] = useState<OrgNode | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [extraSedes, setExtraSedes] = useState<string[]>(loadExtraCenters);
+  const [extraSedes, setExtraSedes] = useState<WorkCenter[]>([]);
   const [manageCentersOpen, setManageCentersOpen] = useState(false);
+  const [centerError, setCenterError] = useState<string | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -127,6 +126,12 @@ export function OrgChartView({
     };
   }, []);
 
+  useEffect(() => {
+    fetchWorkCenters()
+      .then((res) => setExtraSedes(res.data))
+      .catch((err) => setCenterError(err instanceof Error ? err.message : "No se pudieron cargar los centros de trabajo"));
+  }, []);
+
   function handleCanvasMouseDown(e: React.MouseEvent) {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
@@ -150,39 +155,83 @@ export function OrgChartView({
     return counts;
   }, [nodes]);
   const allSedes = useMemo(
-    () => Array.from(new Set([...sedes, ...extraSedes])).sort(),
+    () => Array.from(new Set([...sedes, ...extraSedes.map((c) => c.name)])).sort(),
     [sedes, extraSedes]
   );
 
-  useEffect(() => {
-    localStorage.setItem(EXTRA_CENTERS_KEY, JSON.stringify(extraSedes));
-  }, [extraSedes]);
-
   const workCenterRows = useMemo(
-    () => allSedes.map((name) => ({ name, count: sedeCounts.get(name) ?? 0 })),
-    [allSedes, sedeCounts]
+    () =>
+      allSedes.map((name) => {
+        const profile = extraSedes.find((c) => c.name === name);
+        return {
+          name,
+          count: sedeCounts.get(name) ?? 0,
+          address: profile?.address ?? "",
+          email: profile?.email ?? "",
+          phone: profile?.phone ?? "",
+          headcount: profile?.headcount ?? 0,
+          budget: profile?.budget ?? "",
+        };
+      }),
+    [allSedes, sedeCounts, extraSedes]
   );
 
-  function createWorkCenter(name: string) {
+  async function createWorkCenter(name: string) {
     if (allSedes.some((s) => s.toLowerCase() === name.toLowerCase())) return;
-    setExtraSedes((prev) => [...prev, name]);
+    setCenterError(null);
+    try {
+      await createWorkCenterApi(name);
+      setExtraSedes((prev) => [...prev, { name, address: "", email: "", phone: "", headcount: 0, budget: "" }]);
+    } catch (err) {
+      setCenterError(err instanceof Error ? err.message : "No se pudo crear el centro de trabajo");
+    }
   }
 
-  function renameWorkCenter(oldName: string, newName: string) {
+  async function renameWorkCenter(oldName: string, newName: string) {
     if (allSedes.some((s) => s.toLowerCase() === newName.toLowerCase() && s !== oldName)) return;
-    nodes.forEach((n) => {
-      if (n.sede === oldName) onUpdateNode({ ...n, sede: newName });
-    });
-    setExtraSedes((prev) => prev.map((s) => (s === oldName ? newName : s)));
-    if (sedeFilter === oldName) setSedeFilter(newName);
+    setCenterError(null);
+    try {
+      await renameWorkCenterApi(oldName, newName);
+      nodes.forEach((n) => {
+        if (n.sede === oldName) onUpdateNode({ ...n, sede: newName });
+      });
+      setExtraSedes((prev) => {
+        const existing = prev.find((c) => c.name === oldName);
+        if (existing) return prev.map((c) => (c.name === oldName ? { ...c, name: newName } : c));
+        return [...prev, { name: newName, address: "", email: "", phone: "", headcount: 0, budget: "" }];
+      });
+      if (sedeFilter === oldName) setSedeFilter(newName);
+    } catch (err) {
+      setCenterError(err instanceof Error ? err.message : "No se pudo renombrar el centro de trabajo");
+    }
   }
 
-  function deleteWorkCenter(name: string) {
-    nodes.forEach((n) => {
-      if (n.sede === name) onUpdateNode({ ...n, sede: "" });
-    });
-    setExtraSedes((prev) => prev.filter((s) => s !== name));
-    if (sedeFilter === name) setSedeFilter("all");
+  async function deleteWorkCenter(name: string) {
+    setCenterError(null);
+    try {
+      await deleteWorkCenterApi(name);
+      nodes.forEach((n) => {
+        if (n.sede === name) onUpdateNode({ ...n, sede: "" });
+      });
+      setExtraSedes((prev) => prev.filter((c) => c.name !== name));
+      if (sedeFilter === name) setSedeFilter("all");
+    } catch (err) {
+      setCenterError(err instanceof Error ? err.message : "No se pudo eliminar el centro de trabajo");
+    }
+  }
+
+  async function updateWorkCenterProfile(name: string, profile: Partial<Omit<WorkCenter, "name">>) {
+    setCenterError(null);
+    try {
+      await updateWorkCenterProfileApi(name, profile);
+      setExtraSedes((prev) => {
+        const existing = prev.find((c) => c.name === name);
+        if (existing) return prev.map((c) => (c.name === name ? { ...c, ...profile } : c));
+        return [...prev, { name, address: "", email: "", phone: "", headcount: 0, budget: "", ...profile }];
+      });
+    } catch (err) {
+      setCenterError(err instanceof Error ? err.message : "No se pudo actualizar el centro de trabajo");
+    }
   }
 
   const visibleNodes = useMemo(
@@ -193,6 +242,11 @@ export function OrgChartView({
   function openCreate(parentId: string | null) {
     if (readOnly) return;
     setModalState({ open: true, initial: null, parentId });
+  }
+
+  function openCreateForCenter(sedeName: string) {
+    if (readOnly) return;
+    setModalState({ open: true, initial: null, parentId: null, defaultSede: sedeName });
   }
 
   function openEdit(node: OrgNode) {
@@ -394,10 +448,31 @@ export function OrgChartView({
         </div>
       </div>
 
+      {/* Renders before NodeModal/ConfirmDialog so those stack on top of it when opened from within. */}
+      <WorkCenterManagerModal
+        open={manageCentersOpen}
+        centers={workCenterRows}
+        nodes={nodes}
+        error={centerError}
+        readOnly={readOnly}
+        onClose={() => {
+          setManageCentersOpen(false);
+          setCenterError(null);
+        }}
+        onCreate={createWorkCenter}
+        onRename={renameWorkCenter}
+        onDelete={deleteWorkCenter}
+        onUpdateProfile={updateWorkCenterProfile}
+        onEditNode={openEdit}
+        onCreateNode={openCreateForCenter}
+        onDeleteNode={setDeleteTarget}
+      />
+
       <NodeModal
         open={modalState.open}
         initial={modalState.initial}
         defaultParentId={modalState.parentId}
+        defaultSede={modalState.defaultSede}
         nodes={nodes}
         sedeOptions={allSedes}
         onClose={() => setModalState({ open: false, initial: null, parentId: null })}
@@ -416,15 +491,6 @@ export function OrgChartView({
         danger
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
-      />
-
-      <WorkCenterManagerModal
-        open={manageCentersOpen}
-        centers={workCenterRows}
-        onClose={() => setManageCentersOpen(false)}
-        onCreate={createWorkCenter}
-        onRename={renameWorkCenter}
-        onDelete={deleteWorkCenter}
       />
     </div>
   );

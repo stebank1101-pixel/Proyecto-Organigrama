@@ -142,6 +142,77 @@ async function saveNodes(nodes: any[]): Promise<void> {
   }
 }
 
+// Work centers ("sedes") that don't have any node yet aren't inferable from org_nodes,
+// so they get their own table ("work_centers") when Supabase is configured, or an
+// in-memory list otherwise. Centers that already have nodes are derived from node.sede
+// on the client and merged with the profile data stored here.
+interface WorkCenterRecord {
+  name: string;
+  address: string;
+  email: string;
+  phone: string;
+  headcount: number;
+  budget: string;
+}
+
+function blankCenter(name: string): WorkCenterRecord {
+  return { name, address: "", email: "", phone: "", headcount: 0, budget: "" };
+}
+
+let inMemoryWorkCenters: WorkCenterRecord[] = [];
+
+async function loadWorkCenters(): Promise<WorkCenterRecord[]> {
+  if (!supabase) return inMemoryWorkCenters;
+  const { data, error } = await supabase.from("work_centers").select("*").order("name");
+  if (error) throw new Error(error.message);
+  return data.map((row: any) => ({
+    name: row.name,
+    address: row.address || "",
+    email: row.email || "",
+    phone: row.phone || "",
+    headcount: row.headcount || 0,
+    budget: row.budget || ""
+  }));
+}
+
+async function addWorkCenter(name: string): Promise<void> {
+  if (!supabase) {
+    if (!inMemoryWorkCenters.some((c) => c.name === name)) inMemoryWorkCenters.push(blankCenter(name));
+    return;
+  }
+  const { error } = await supabase.from("work_centers").insert({ name });
+  if (error && error.code !== "23505") throw new Error(error.message);
+}
+
+async function renameWorkCenterEntry(oldName: string, newName: string): Promise<void> {
+  if (!supabase) {
+    inMemoryWorkCenters = inMemoryWorkCenters.map((c) => (c.name === oldName ? { ...c, name: newName } : c));
+    return;
+  }
+  const { error } = await supabase.from("work_centers").update({ name: newName }).eq("name", oldName);
+  if (error) throw new Error(error.message);
+}
+
+async function deleteWorkCenterEntry(name: string): Promise<void> {
+  if (!supabase) {
+    inMemoryWorkCenters = inMemoryWorkCenters.filter((c) => c.name !== name);
+    return;
+  }
+  const { error } = await supabase.from("work_centers").delete().eq("name", name);
+  if (error) throw new Error(error.message);
+}
+
+async function updateWorkCenterProfile(name: string, profile: Partial<Omit<WorkCenterRecord, "name">>): Promise<void> {
+  if (!supabase) {
+    const idx = inMemoryWorkCenters.findIndex((c) => c.name === name);
+    if (idx === -1) inMemoryWorkCenters.push({ ...blankCenter(name), ...profile });
+    else inMemoryWorkCenters[idx] = { ...inMemoryWorkCenters[idx], ...profile };
+    return;
+  }
+  const { error } = await supabase.from("work_centers").upsert({ name, ...profile }, { onConflict: "name" });
+  if (error) throw new Error(error.message);
+}
+
 let apiKeysStore = [
   {
     id: "key-1",
@@ -337,6 +408,66 @@ app.post("/api/v1/nodes/bulk-sync", requireAdmin, async (req, res) => {
     return res.json({ success: true, count: nodes.length });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// Work centers ("centros de trabajo") management
+app.get("/api/v1/work-centers", async (req, res) => {
+  try {
+    const centers = await loadWorkCenters();
+    res.json({ success: true, data: centers });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/v1/work-centers", requireAdmin, async (req, res) => {
+  const name = (req.body?.name || "").trim();
+  if (!name) return res.status(400).json({ error: "El nombre del centro de trabajo es obligatorio" });
+  try {
+    await addWorkCenter(name);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
+  const oldName = decodeURIComponent(req.params.name);
+  const newName = (req.body?.name || "").trim();
+  if (!newName) return res.status(400).json({ error: "El nuevo nombre es obligatorio" });
+  try {
+    await renameWorkCenterEntry(oldName, newName);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
+  const name = decodeURIComponent(req.params.name);
+  const { address, email, phone, headcount, budget } = req.body || {};
+  try {
+    await updateWorkCenterProfile(name, {
+      ...(address !== undefined ? { address } : {}),
+      ...(email !== undefined ? { email } : {}),
+      ...(phone !== undefined ? { phone } : {}),
+      ...(headcount !== undefined ? { headcount: Number(headcount) || 0 } : {}),
+      ...(budget !== undefined ? { budget } : {})
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
+  const name = decodeURIComponent(req.params.name);
+  try {
+    await deleteWorkCenterEntry(name);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

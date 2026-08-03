@@ -1,4 +1,4 @@
-import type { ApiKeyRecord, OrgNode, SyncLogRecord, UserProfile } from "../types";
+import type { ApiKeyRecord, OrgNode, SyncLogRecord, UserProfile, WorkCenter } from "../types";
 
 const TOKEN_STORAGE_KEY = "orgcraft.auth.token";
 
@@ -76,6 +76,38 @@ export function bulkSyncNodes(nodes: OrgNode[]): Promise<{ success: boolean; cou
     method: "POST",
     body: JSON.stringify({ nodes }),
   });
+}
+
+export function fetchWorkCenters(): Promise<{ success: boolean; data: WorkCenter[] }> {
+  return request("/api/v1/work-centers");
+}
+
+export function createWorkCenterApi(name: string): Promise<{ success: boolean }> {
+  return request("/api/v1/work-centers", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function renameWorkCenterApi(oldName: string, newName: string): Promise<{ success: boolean }> {
+  return request(`/api/v1/work-centers/${encodeURIComponent(oldName)}`, {
+    method: "PUT",
+    body: JSON.stringify({ name: newName }),
+  });
+}
+
+export function updateWorkCenterProfileApi(
+  name: string,
+  profile: Partial<Omit<WorkCenter, "name">>
+): Promise<{ success: boolean }> {
+  return request(`/api/v1/work-centers/${encodeURIComponent(name)}`, {
+    method: "PATCH",
+    body: JSON.stringify(profile),
+  });
+}
+
+export function deleteWorkCenterApi(name: string): Promise<{ success: boolean }> {
+  return request(`/api/v1/work-centers/${encodeURIComponent(name)}`, { method: "DELETE" });
 }
 
 export function fetchApiKeys(): Promise<{ data: ApiKeyRecord[] }> {

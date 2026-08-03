@@ -10,20 +10,21 @@ interface NodeModalProps {
   open: boolean;
   initial: OrgNode | null;
   defaultParentId: string | null;
+  defaultSede?: string;
   nodes: OrgNode[];
   sedeOptions?: string[];
   onClose: () => void;
   onSave: (node: OrgNode) => void;
 }
 
-function emptyNode(defaultParentId: string | null): OrgNode {
+function emptyNode(defaultParentId: string | null, defaultSede?: string): OrgNode {
   return {
     id: "",
     name: "",
     title: "",
     assignees: [],
     department: "",
-    sede: "",
+    sede: defaultSede ?? "",
     email: "",
     phone: "",
     avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
@@ -53,15 +54,15 @@ function getDescendantIds(nodeId: string, nodes: OrgNode[]): Set<string> {
   return result;
 }
 
-export function NodeModal({ open, initial, defaultParentId, nodes, sedeOptions, onClose, onSave }: NodeModalProps) {
-  const [form, setForm] = useState<OrgNode>(() => initial ?? emptyNode(defaultParentId));
+export function NodeModal({ open, initial, defaultParentId, defaultSede, nodes, sedeOptions, onClose, onSave }: NodeModalProps) {
+  const [form, setForm] = useState<OrgNode>(() => initial ?? emptyNode(defaultParentId, defaultSede));
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
-      setForm(initial ?? emptyNode(defaultParentId));
+      setForm(initial ?? emptyNode(defaultParentId, defaultSede));
     }
-  }, [open, initial, defaultParentId]);
+  }, [open, initial, defaultParentId, defaultSede]);
 
   if (!open) return null;
 

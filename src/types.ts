@@ -13,6 +13,15 @@ export interface Assignee {
   avatar: string;
 }
 
+export interface WorkCenter {
+  name: string;
+  address: string;
+  email: string;
+  phone: string;
+  headcount: number;
+  budget: string;
+}
+
 export interface OrgNode {
   id: string;
   name: string;
