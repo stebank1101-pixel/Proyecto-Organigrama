@@ -1,16 +1,31 @@
 import { toPng, toSvg } from "html-to-image";
 import { jsPDF } from "jspdf";
-import { Building2, Download, FileImage, FileText, ListTree, Network, Plus, Save, Search } from "lucide-react";
+import { Building2, Download, FileImage, FileText, ListTree, Network, Plus, Save, Search, Settings } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { OrgNode, ViewMode } from "../types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { FreeView } from "./FreeView";
 import { NodeModal } from "./NodeModal";
 import { TreeView } from "./TreeView";
+import { WorkCenterManagerModal } from "./WorkCenterManagerModal";
 
 // Extra empty margin around the chart so there's always room to drag-pan in every
 // direction, even when the chart itself is smaller than the viewport.
 const PAN_PADDING = 400;
+
+// Work centers created without any employee yet aren't backed by a node, so they're
+// tracked here and kept alongside whatever sedes are actually in use on nodes.
+const EXTRA_CENTERS_KEY = "orgcraft.extraWorkCenters";
+
+function loadExtraCenters(): string[] {
+  try {
+    const raw = localStorage.getItem(EXTRA_CENTERS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
 
 interface OrgChartViewProps {
   nodes: OrgNode[];
@@ -73,6 +88,8 @@ export function OrgChartView({
   });
   const [deleteTarget, setDeleteTarget] = useState<OrgNode | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [extraSedes, setExtraSedes] = useState<string[]>(loadExtraCenters);
+  const [manageCentersOpen, setManageCentersOpen] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -131,6 +148,41 @@ export function OrgChartView({
     }
     return counts;
   }, [nodes]);
+  const allSedes = useMemo(
+    () => Array.from(new Set([...sedes, ...extraSedes])).sort(),
+    [sedes, extraSedes]
+  );
+
+  useEffect(() => {
+    localStorage.setItem(EXTRA_CENTERS_KEY, JSON.stringify(extraSedes));
+  }, [extraSedes]);
+
+  const workCenterRows = useMemo(
+    () => allSedes.map((name) => ({ name, count: sedeCounts.get(name) ?? 0 })),
+    [allSedes, sedeCounts]
+  );
+
+  function createWorkCenter(name: string) {
+    if (allSedes.some((s) => s.toLowerCase() === name.toLowerCase())) return;
+    setExtraSedes((prev) => [...prev, name]);
+  }
+
+  function renameWorkCenter(oldName: string, newName: string) {
+    if (allSedes.some((s) => s.toLowerCase() === newName.toLowerCase() && s !== oldName)) return;
+    nodes.forEach((n) => {
+      if (n.sede === oldName) onUpdateNode({ ...n, sede: newName });
+    });
+    setExtraSedes((prev) => prev.map((s) => (s === oldName ? newName : s)));
+    if (sedeFilter === oldName) setSedeFilter(newName);
+  }
+
+  function deleteWorkCenter(name: string) {
+    nodes.forEach((n) => {
+      if (n.sede === name) onUpdateNode({ ...n, sede: "" });
+    });
+    setExtraSedes((prev) => prev.filter((s) => s !== name));
+    if (sedeFilter === name) setSedeFilter("all");
+  }
 
   const visibleNodes = useMemo(
     () => computeVisibleNodes(nodes, sedeFilter, deptFilter, search),
@@ -270,7 +322,7 @@ export function OrgChartView({
         </div>
       </div>
 
-      {sedes.length > 0 && (
+      {(allSedes.length > 0 || !readOnly) && (
         <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-200 bg-slate-50 px-4 py-2">
           <span className="flex flex-shrink-0 items-center gap-1 text-[11px] font-medium text-slate-500">
             <Building2 className="h-3.5 w-3.5" /> Centros de trabajo:
@@ -285,7 +337,7 @@ export function OrgChartView({
           >
             Todos ({nodes.length})
           </button>
-          {sedes.map((s) => (
+          {allSedes.map((s) => (
             <button
               key={s}
               onClick={() => setSedeFilter(s)}
@@ -298,6 +350,15 @@ export function OrgChartView({
               {s} ({sedeCounts.get(s) ?? 0})
             </button>
           ))}
+          {!readOnly && (
+            <button
+              onClick={() => setManageCentersOpen(true)}
+              className="ml-auto flex flex-shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:border-sky-300"
+              title="Crear o modificar centros de trabajo"
+            >
+              <Settings className="h-3 w-3" /> Gestionar
+            </button>
+          )}
         </div>
       )}
 
@@ -337,6 +398,7 @@ export function OrgChartView({
         initial={modalState.initial}
         defaultParentId={modalState.parentId}
         nodes={nodes}
+        sedeOptions={allSedes}
         onClose={() => setModalState({ open: false, initial: null, parentId: null })}
         onSave={handleModalSave}
       />
@@ -353,6 +415,15 @@ export function OrgChartView({
         danger
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <WorkCenterManagerModal
+        open={manageCentersOpen}
+        centers={workCenterRows}
+        onClose={() => setManageCentersOpen(false)}
+        onCreate={createWorkCenter}
+        onRename={renameWorkCenter}
+        onDelete={deleteWorkCenter}
       />
     </div>
   );

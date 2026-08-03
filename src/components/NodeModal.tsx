@@ -9,6 +9,7 @@ interface NodeModalProps {
   initial: OrgNode | null;
   defaultParentId: string | null;
   nodes: OrgNode[];
+  sedeOptions?: string[];
   onClose: () => void;
   onSave: (node: OrgNode) => void;
 }
@@ -49,7 +50,7 @@ function getDescendantIds(nodeId: string, nodes: OrgNode[]): Set<string> {
   return result;
 }
 
-export function NodeModal({ open, initial, defaultParentId, nodes, onClose, onSave }: NodeModalProps) {
+export function NodeModal({ open, initial, defaultParentId, nodes, sedeOptions, onClose, onSave }: NodeModalProps) {
   const [form, setForm] = useState<OrgNode>(() => initial ?? emptyNode(defaultParentId));
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -107,7 +108,17 @@ export function NodeModal({ open, initial, defaultParentId, nodes, onClose, onSa
               <input className="input" value={form.department} onChange={(e) => update("department", e.target.value)} />
             </Field>
             <Field label="Sede">
-              <input className="input" value={form.sede} onChange={(e) => update("sede", e.target.value)} />
+              <input
+                className="input"
+                list="sede-options"
+                value={form.sede}
+                onChange={(e) => update("sede", e.target.value)}
+              />
+              <datalist id="sede-options">
+                {(sedeOptions ?? []).map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
             </Field>
           </div>
 
