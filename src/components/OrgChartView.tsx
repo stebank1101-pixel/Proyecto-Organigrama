@@ -37,6 +37,7 @@ interface OrgChartViewProps {
   onUpdateNode: (node: OrgNode) => void;
   onDeleteNode: (id: string) => void;
   onMoveNode: (id: string, x: number, y: number) => void;
+  onReparentNode: (id: string, newParentId: string) => void;
   onSave: () => void;
   onCreateWorkCenter: (name: string) => Promise<boolean>;
   onRenameWorkCenter: (oldName: string, newName: string) => Promise<boolean>;
@@ -82,6 +83,7 @@ export function OrgChartView({
   onUpdateNode,
   onDeleteNode,
   onMoveNode,
+  onReparentNode,
   onSave,
   onCreateWorkCenter,
   onRenameWorkCenter,
@@ -396,6 +398,12 @@ export function OrgChartView({
             )}
           </div>
 
+          {viewMode === "free" && activeCenter && !readOnly && (
+            <p className="border-b border-slate-200 bg-sky-50 px-4 py-1.5 text-[11px] text-sky-700">
+              Arrastra una tarjeta y suéltala sobre otra para reasignar su jefe directo — la línea se redibuja sola.
+            </p>
+          )}
+
           <div
             ref={scrollRef}
             onMouseDown={handleCanvasMouseDown}
@@ -424,6 +432,7 @@ export function OrgChartView({
                   onDelete={setDeleteTarget}
                   onAddChild={(p) => openCreate(p.id)}
                   onNodeMove={onMoveNode}
+                  onReparent={readOnly ? undefined : onReparentNode}
                   readOnly={readOnly}
                   compact={compact}
                 />

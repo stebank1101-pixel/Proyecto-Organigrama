@@ -7,23 +7,42 @@ const CARD_H_FULL = 188;
 const CARD_H_COMPACT = 92;
 const PADDING = 260;
 
+// Every descendant of `nodeId` is an invalid reparent target — dropping a node onto
+// its own descendant would create a cycle in the reporting chain.
+function getDescendantIds(nodeId: string, nodes: OrgNode[]): Set<string> {
+  const result = new Set<string>();
+  const stack = [nodeId];
+  while (stack.length > 0) {
+    const current = stack.pop() as string;
+    for (const n of nodes) {
+      if (n.parentId === current && !result.has(n.id)) {
+        result.add(n.id);
+        stack.push(n.id);
+      }
+    }
+  }
+  return result;
+}
+
 interface FreeViewProps {
   nodes: OrgNode[];
   onEdit: (node: OrgNode) => void;
   onDelete: (node: OrgNode) => void;
   onAddChild: (parent: OrgNode) => void;
   onNodeMove: (id: string, x: number, y: number) => void;
+  onReparent?: (id: string, newParentId: string) => void;
   highlightedId?: string | null;
   readOnly?: boolean;
   compact?: boolean;
 }
 
 export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeView(
-  { nodes, onEdit, onDelete, onAddChild, onNodeMove, highlightedId, readOnly, compact },
+  { nodes, onEdit, onDelete, onAddChild, onNodeMove, onReparent, highlightedId, readOnly, compact },
   forwardedRef
 ) {
-  const dragState = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
+  const dragState = useRef<{ id: string; offsetX: number; offsetY: number; blockedIds: Set<string> } | null>(null);
   const [, forceRerender] = useState(0);
+  const [hoverTargetId, setHoverTargetId] = useState<string | null>(null);
   const CARD_H = compact ? CARD_H_COMPACT : CARD_H_FULL;
 
   const nodesById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
@@ -48,6 +67,7 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
       id: node.id,
       offsetX: e.clientX - node.freeX,
       offsetY: e.clientY - node.freeY,
+      blockedIds: getDescendantIds(node.id, nodes),
     };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
@@ -61,6 +81,19 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
     const nextY = Math.max(0, e.clientY - drag.offsetY);
     node.freeX = nextX;
     node.freeY = nextY;
+
+    // Drop the dragged card's center onto another card to reassign its reporting line.
+    const cx = nextX + CARD_W / 2;
+    const cy = nextY + CARD_H / 2;
+    let hovered: string | null = null;
+    for (const other of nodes) {
+      if (other.id === node.id || drag.blockedIds.has(other.id)) continue;
+      if (cx >= other.freeX && cx <= other.freeX + CARD_W && cy >= other.freeY && cy <= other.freeY + CARD_H) {
+        hovered = other.id;
+        break;
+      }
+    }
+    setHoverTargetId(hovered);
     forceRerender((v) => v + 1);
   }
 
@@ -68,10 +101,16 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
     if (dragState.current) {
       const drag = dragState.current;
       const node = nodesById.get(drag.id);
-      if (node) onNodeMove(node.id, node.freeX, node.freeY);
+      if (node) {
+        onNodeMove(node.id, node.freeX, node.freeY);
+        if (hoverTargetId && hoverTargetId !== node.parentId && onReparent) {
+          onReparent(node.id, hoverTargetId);
+        }
+      }
       document.body.style.userSelect = "";
     }
     dragState.current = null;
+    setHoverTargetId(null);
   }
 
   if (nodes.length === 0) {
@@ -116,7 +155,9 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
       {nodes.map((node) => (
         <div
           key={node.id}
-          className={readOnly ? "absolute" : "absolute cursor-grab active:cursor-grabbing"}
+          className={`absolute transition-shadow ${readOnly ? "" : "cursor-grab active:cursor-grabbing"} ${
+            dragState.current?.id === node.id ? "z-30 opacity-90 drop-shadow-lg" : ""
+          } ${hoverTargetId === node.id ? "rounded-xl ring-4 ring-emerald-400 ring-offset-2" : ""}`}
           style={{ left: node.freeX, top: node.freeY, touchAction: "none" }}
           onPointerDown={(e) => handlePointerDown(e, node)}
         >

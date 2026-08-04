@@ -97,6 +97,12 @@ export default function App() {
     setDirty(true);
   }
 
+  function handleReparentNode(id: string, newParentId: string) {
+    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId: newParentId } : n)));
+    setDirty(true);
+    pushToast("Jefe directo reasignado");
+  }
+
   async function handleBulkUpdateNodes(updatedNodes: OrgNode[]) {
     setNodes(updatedNodes);
     setDirty(true);
@@ -239,6 +245,7 @@ export default function App() {
             onUpdateNode={handleUpdateNode}
             onDeleteNode={handleDeleteNode}
             onMoveNode={handleMoveNode}
+            onReparentNode={handleReparentNode}
             onSave={handleSave}
             onCreateWorkCenter={handleCreateWorkCenter}
             onRenameWorkCenter={handleRenameWorkCenter}
