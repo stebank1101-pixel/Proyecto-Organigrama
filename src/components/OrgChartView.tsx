@@ -26,6 +26,7 @@ interface OrgChartViewProps {
   onUpdateNode: (node: OrgNode) => void;
   onDeleteNode: (id: string) => void;
   onMoveNode: (id: string, x: number, y: number) => void;
+  onBulkUpdateNodes: (nodes: OrgNode[]) => Promise<void>;
   onSave: () => void;
   saving: boolean;
   dirty: boolean;
@@ -66,6 +67,7 @@ export function OrgChartView({
   onUpdateNode,
   onDeleteNode,
   onMoveNode,
+  onBulkUpdateNodes,
   onSave,
   saving,
   dirty,
@@ -192,9 +194,9 @@ export function OrgChartView({
     setCenterError(null);
     try {
       await renameWorkCenterApi(oldName, newName);
-      nodes.forEach((n) => {
-        if (n.sede === oldName) onUpdateNode({ ...n, sede: newName });
-      });
+      if (nodes.some((n) => n.sede === oldName)) {
+        await onBulkUpdateNodes(nodes.map((n) => (n.sede === oldName ? { ...n, sede: newName } : n)));
+      }
       setExtraSedes((prev) => {
         const existing = prev.find((c) => c.name === oldName);
         if (existing) return prev.map((c) => (c.name === oldName ? { ...c, name: newName } : c));
@@ -210,9 +212,9 @@ export function OrgChartView({
     setCenterError(null);
     try {
       await deleteWorkCenterApi(name);
-      nodes.forEach((n) => {
-        if (n.sede === name) onUpdateNode({ ...n, sede: "" });
-      });
+      if (nodes.some((n) => n.sede === name)) {
+        await onBulkUpdateNodes(nodes.map((n) => (n.sede === name ? { ...n, sede: "" } : n)));
+      }
       setExtraSedes((prev) => prev.filter((c) => c.name !== name));
       if (sedeFilter === name) setSedeFilter("all");
     } catch (err) {

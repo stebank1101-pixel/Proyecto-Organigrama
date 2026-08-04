@@ -80,6 +80,13 @@ export default function App() {
     setDirty(true);
   }
 
+  async function handleBulkUpdateNodes(updatedNodes: OrgNode[]) {
+    setNodes(updatedNodes);
+    setDirty(true);
+    await bulkSyncNodes(updatedNodes);
+    setDirty(false);
+  }
+
   function handleApplyAiNodes(newNodes: OrgNode[], mode: "replace" | "append") {
     if (mode === "replace") {
       setNodes(newNodes);
@@ -149,6 +156,7 @@ export default function App() {
             onUpdateNode={handleUpdateNode}
             onDeleteNode={handleDeleteNode}
             onMoveNode={handleMoveNode}
+            onBulkUpdateNodes={handleBulkUpdateNodes}
             onSave={handleSave}
             saving={saving}
             dirty={dirty}
