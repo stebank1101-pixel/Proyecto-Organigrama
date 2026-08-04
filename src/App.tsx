@@ -103,6 +103,11 @@ export default function App() {
     pushToast("Jefe directo reasignado");
   }
 
+  function handleLineAdjust(id: string, midX: number, midY: number) {
+    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, lineMidX: midX, lineMidY: midY } : n)));
+    setDirty(true);
+  }
+
   async function handleBulkUpdateNodes(updatedNodes: OrgNode[]) {
     setNodes(updatedNodes);
     setDirty(true);
@@ -246,6 +251,7 @@ export default function App() {
             onDeleteNode={handleDeleteNode}
             onMoveNode={handleMoveNode}
             onReparentNode={handleReparentNode}
+            onLineAdjust={handleLineAdjust}
             onSave={handleSave}
             onCreateWorkCenter={handleCreateWorkCenter}
             onRenameWorkCenter={handleRenameWorkCenter}

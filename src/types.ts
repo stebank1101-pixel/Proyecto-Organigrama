@@ -45,6 +45,10 @@ export interface OrgNode {
   textColor?: string;
   fontFamily?: string;
   customIcon?: string;
+  /** Manual bend point (Vista libre canvas coordinates) for the connector line coming
+   * from this node's parent. Undefined uses the automatic midpoint. */
+  lineMidX?: number;
+  lineMidY?: number;
 }
 
 export interface FontOption {
