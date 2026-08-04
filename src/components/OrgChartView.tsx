@@ -1,26 +1,11 @@
 import { toPng, toSvg } from "html-to-image";
 import { jsPDF } from "jspdf";
-import {
-  ArrowLeft,
-  Building2,
-  Download,
-  FileImage,
-  FileText,
-  IdCard,
-  Link2,
-  ListTree,
-  Network,
-  Plus,
-  Save,
-  Search,
-  Settings,
-} from "lucide-react";
+import { ArrowLeft, Building2, Download, FileImage, FileText, IdCard, Link2, Plus, Save, Search, Settings } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { computeAllSedes, computeWorkCenterRows, type CenterSelection } from "../lib/workCenters";
-import type { OrgNode, ViewMode, WorkCenter } from "../types";
+import type { OrgNode, WorkCenter } from "../types";
 import { AllCentersOverview } from "./AllCentersOverview";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { FreeView } from "./FreeView";
 import { NodeModal } from "./NodeModal";
 import { TreeView } from "./TreeView";
 import { WorkCenterManagerModal } from "./WorkCenterManagerModal";
@@ -37,10 +22,7 @@ interface OrgChartViewProps {
   onAddNode: (node: OrgNode) => void;
   onUpdateNode: (node: OrgNode) => void;
   onDeleteNode: (id: string) => void;
-  onMoveNode: (id: string, x: number, y: number) => void;
   onReparentNode: (id: string, newParentId: string) => void;
-  onLineAdjust: (id: string, offsetX: number, offsetY: number) => void;
-  onLineReset: (id: string) => void;
   onLineDelete: (id: string) => void;
   onCoordinationLink: (id: string, targetId: string) => void;
   onCoordinationStyleToggle: (id: string, targetId: string) => void;
@@ -90,10 +72,7 @@ export function OrgChartView({
   onAddNode,
   onUpdateNode,
   onDeleteNode,
-  onMoveNode,
   onReparentNode,
-  onLineAdjust,
-  onLineReset,
   onLineDelete,
   onCoordinationLink,
   onCoordinationStyleToggle,
@@ -109,11 +88,10 @@ export function OrgChartView({
   readOnly,
 }: OrgChartViewProps) {
   const [selectedCenter, setSelectedCenter] = useState<CenterSelection>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("tree");
   // Compact shows only area + cargo per box; detailed reveals the rest of the node's
   // data (contact info, badges, metrics) for whoever needs it later. Remembered per browser.
   const [compact, setCompact] = useState(() => localStorage.getItem("orgcraft.compactCards") !== "false");
-  // While on, dragging in Vista libre draws a coordination line instead of moving the card —
+  // While on, dragging a card draws a coordination line instead of reassigning its boss —
   // an explicit toggle so the feature doesn't rely on discovering the Shift+drag shortcut.
   const [linkMode, setLinkMode] = useState(false);
   const [deptFilter, setDeptFilter] = useState("all");
@@ -143,11 +121,8 @@ export function OrgChartView({
     if (!container) return;
     container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
     container.scrollTop = Math.max(0, PAN_PADDING - 24);
-  }, [viewMode, selectedCenter, deptFilter, search]);
-
-  useEffect(() => {
     setLinkMode(false);
-  }, [viewMode, selectedCenter]);
+  }, [selectedCenter, deptFilter, search]);
 
   useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
@@ -304,28 +279,7 @@ export function OrgChartView({
               <ArrowLeft className="h-3.5 w-3.5" />
             </button>
 
-            {activeCenter && (
-              <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                <button
-                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
-                    viewMode === "tree" ? "bg-white text-sky-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
-                  }`}
-                  onClick={() => setViewMode("tree")}
-                >
-                  <ListTree className="h-3.5 w-3.5" /> Jerárquico
-                </button>
-                <button
-                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
-                    viewMode === "free" ? "bg-white text-sky-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
-                  }`}
-                  onClick={() => setViewMode("free")}
-                >
-                  <Network className="h-3.5 w-3.5" /> Vista libre
-                </button>
-              </div>
-            )}
-
-            {activeCenter && viewMode === "free" && !readOnly && (
+            {activeCenter && !readOnly && (
               <button
                 onClick={() => setLinkMode((v) => !v)}
                 className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
@@ -432,11 +386,11 @@ export function OrgChartView({
             )}
           </div>
 
-          {viewMode === "free" && activeCenter && !readOnly && (
+          {activeCenter && !readOnly && (
             <p className={`border-b px-4 py-1.5 text-[11px] ${linkMode ? "border-purple-200 bg-purple-50 text-purple-700" : "border-slate-200 bg-sky-50 text-sky-700"}`}>
               {linkMode
                 ? "Modo conectar activo: arrastra de una tarjeta a otra para crear una línea punteada de coordinación. Vuelve a hacer clic en \"Conectando...\" para salir."
-                : "Arrastra una tarjeta sobre otra para reasignar su jefe directo, o haz clic en la \"×\" roja de una línea para quitarla. Usa el botón \"Conectar líneas\" para crear conexiones de coordinación."}
+                : "Arrastra una tarjeta sobre otra para reasignar su jefe directo, usa el ícono de desvincular en una tarjeta para quitarle el jefe, o el botón \"Conectar líneas\" para crear conexiones de coordinación."}
             </p>
           )}
 
@@ -450,37 +404,22 @@ export function OrgChartView({
             <div style={{ padding: PAN_PADDING }} className="inline-block min-w-full">
               {selectedCenter === "ALL" ? (
                 <AllCentersOverview ref={contentRef} nodes={nodes} allSedes={allSedes} compact={compact} />
-              ) : viewMode === "tree" ? (
+              ) : (
                 <TreeView
                   ref={contentRef}
                   nodes={visibleNodes}
                   onEdit={openEdit}
                   onDelete={setDeleteTarget}
                   onAddChild={(p) => openCreate(p.id)}
+                  onRemoveBoss={readOnly ? undefined : (node) => onLineDelete(node.id)}
                   readOnly={readOnly}
                   compact={compact}
-                  onCoordinationStyleToggle={readOnly ? undefined : onCoordinationStyleToggle}
-                  onCoordinationUnlink={readOnly ? undefined : onCoordinationUnlink}
-                />
-              ) : (
-                <FreeView
-                  ref={contentRef}
-                  nodes={visibleNodes}
-                  onEdit={openEdit}
-                  onDelete={setDeleteTarget}
-                  onAddChild={(p) => openCreate(p.id)}
-                  onNodeMove={onMoveNode}
+                  linkMode={linkMode}
                   onReparent={readOnly ? undefined : onReparentNode}
-                  onLineAdjust={readOnly ? undefined : onLineAdjust}
-                  onLineReset={readOnly ? undefined : onLineReset}
-                  onLineDelete={readOnly ? undefined : onLineDelete}
                   onCoordinationLink={readOnly ? undefined : onCoordinationLink}
                   onCoordinationStyleToggle={readOnly ? undefined : onCoordinationStyleToggle}
                   onCoordinationLineAdjust={readOnly ? undefined : onCoordinationLineAdjust}
                   onCoordinationUnlink={readOnly ? undefined : onCoordinationUnlink}
-                  readOnly={readOnly}
-                  compact={compact}
-                  linkMode={linkMode}
                 />
               )}
             </div>

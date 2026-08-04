@@ -1,4 +1,4 @@
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Unlink } from "lucide-react";
 import { getDepartmentStyle } from "../lib/departmentColors";
 import { OrgIcon } from "../lib/icons";
 import type { OrgNode } from "../types";
@@ -8,6 +8,7 @@ interface NodeCardProps {
   onEdit: (node: OrgNode) => void;
   onDelete: (node: OrgNode) => void;
   onAddChild: (parent: OrgNode) => void;
+  onRemoveBoss?: (node: OrgNode) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   highlighted?: boolean;
   readOnly?: boolean;
@@ -16,7 +17,7 @@ interface NodeCardProps {
   compact?: boolean;
 }
 
-export function NodeCard({ node, onEdit, onDelete, onAddChild, dragHandleProps, highlighted, readOnly, compact }: NodeCardProps) {
+export function NodeCard({ node, onEdit, onDelete, onAddChild, onRemoveBoss, dragHandleProps, highlighted, readOnly, compact }: NodeCardProps) {
   const style = getDepartmentStyle(node.department);
   const textStyle: React.CSSProperties | undefined = node.textColor ? { color: node.textColor } : undefined;
   const mutedTextStyle: React.CSSProperties | undefined = node.textColor ? { color: node.textColor, opacity: 0.75 } : undefined;
@@ -84,6 +85,16 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, dragHandleProps, 
           >
             <Pencil className="h-3 w-3" />
           </button>
+          {node.parentId && onRemoveBoss && (
+            <button
+              type="button"
+              onClick={() => onRemoveBoss(node)}
+              className="rounded-full bg-white p-1.5 text-amber-600 shadow ring-1 ring-slate-200 hover:bg-amber-50"
+              title="Quitar jefe directo (deja al nodo sin jefe)"
+            >
+              <Unlink className="h-3 w-3" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onDelete(node)}

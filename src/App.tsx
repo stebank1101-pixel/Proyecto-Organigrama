@@ -92,29 +92,14 @@ export default function App() {
     setDirty(true);
   }
 
-  function handleMoveNode(id: string, x: number, y: number) {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, freeX: x, freeY: y } : n)));
-    setDirty(true);
-  }
-
   function handleReparentNode(id: string, newParentId: string) {
     setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId: newParentId } : n)));
     setDirty(true);
     pushToast("Jefe directo reasignado");
   }
 
-  function handleLineAdjust(id: string, offsetX: number, offsetY: number) {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, lineOffsetX: offsetX, lineOffsetY: offsetY } : n)));
-    setDirty(true);
-  }
-
-  function handleLineReset(id: string) {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, lineOffsetX: undefined, lineOffsetY: undefined } : n)));
-    setDirty(true);
-  }
-
   function handleLineDelete(id: string) {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId: null, lineOffsetX: undefined, lineOffsetY: undefined } : n)));
+    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId: null } : n)));
     setDirty(true);
     pushToast("Línea de jefe directo eliminada");
   }
@@ -310,10 +295,7 @@ export default function App() {
             onAddNode={handleAddNode}
             onUpdateNode={handleUpdateNode}
             onDeleteNode={handleDeleteNode}
-            onMoveNode={handleMoveNode}
             onReparentNode={handleReparentNode}
-            onLineAdjust={handleLineAdjust}
-            onLineReset={handleLineReset}
             onLineDelete={handleLineDelete}
             onCoordinationLink={handleCoordinationLink}
             onCoordinationStyleToggle={handleCoordinationStyleToggle}
