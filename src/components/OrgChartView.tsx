@@ -459,6 +459,8 @@ export function OrgChartView({
                   onAddChild={(p) => openCreate(p.id)}
                   readOnly={readOnly}
                   compact={compact}
+                  onCoordinationStyleToggle={readOnly ? undefined : onCoordinationStyleToggle}
+                  onCoordinationUnlink={readOnly ? undefined : onCoordinationUnlink}
                 />
               ) : (
                 <FreeView
