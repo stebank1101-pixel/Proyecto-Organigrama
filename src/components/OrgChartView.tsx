@@ -38,7 +38,8 @@ interface OrgChartViewProps {
   onDeleteNode: (id: string) => void;
   onMoveNode: (id: string, x: number, y: number) => void;
   onReparentNode: (id: string, newParentId: string) => void;
-  onLineAdjust: (id: string, midX: number, midY: number) => void;
+  onLineAdjust: (id: string, offsetX: number, offsetY: number) => void;
+  onLineReset: (id: string) => void;
   onSave: () => void;
   onCreateWorkCenter: (name: string) => Promise<boolean>;
   onRenameWorkCenter: (oldName: string, newName: string) => Promise<boolean>;
@@ -86,6 +87,7 @@ export function OrgChartView({
   onMoveNode,
   onReparentNode,
   onLineAdjust,
+  onLineReset,
   onSave,
   onCreateWorkCenter,
   onRenameWorkCenter,
@@ -402,7 +404,7 @@ export function OrgChartView({
 
           {viewMode === "free" && activeCenter && !readOnly && (
             <p className="border-b border-slate-200 bg-sky-50 px-4 py-1.5 text-[11px] text-sky-700">
-              Arrastra una tarjeta y suéltala sobre otra para reasignar su jefe directo. Arrastra el punto azul de una línea para curvarla manualmente.
+              Arrastra una tarjeta y suéltala sobre otra para reasignar su jefe directo. Arrastra el punto azul de una línea para curvarla; doble clic sobre el punto la restablece.
             </p>
           )}
 
@@ -436,6 +438,7 @@ export function OrgChartView({
                   onNodeMove={onMoveNode}
                   onReparent={readOnly ? undefined : onReparentNode}
                   onLineAdjust={readOnly ? undefined : onLineAdjust}
+                  onLineReset={readOnly ? undefined : onLineReset}
                   readOnly={readOnly}
                   compact={compact}
                 />

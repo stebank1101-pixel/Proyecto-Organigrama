@@ -45,10 +45,11 @@ export interface OrgNode {
   textColor?: string;
   fontFamily?: string;
   customIcon?: string;
-  /** Manual bend point (Vista libre canvas coordinates) for the connector line coming
-   * from this node's parent. Undefined uses the automatic midpoint. */
-  lineMidX?: number;
-  lineMidY?: number;
+  /** Manual bend for the connector line coming from this node's parent, stored as an
+   * offset from the automatic midpoint (not an absolute point) so the curve's shape
+   * stays put as either connected card is dragged around. Undefined = no manual bend. */
+  lineOffsetX?: number;
+  lineOffsetY?: number;
 }
 
 export interface FontOption {

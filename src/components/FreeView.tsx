@@ -31,18 +31,22 @@ interface FreeViewProps {
   onAddChild: (parent: OrgNode) => void;
   onNodeMove: (id: string, x: number, y: number) => void;
   onReparent?: (id: string, newParentId: string) => void;
-  onLineAdjust?: (id: string, midX: number, midY: number) => void;
+  onLineAdjust?: (id: string, offsetX: number, offsetY: number) => void;
+  onLineReset?: (id: string) => void;
   highlightedId?: string | null;
   readOnly?: boolean;
   compact?: boolean;
 }
 
 export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeView(
-  { nodes, onEdit, onDelete, onAddChild, onNodeMove, onReparent, onLineAdjust, highlightedId, readOnly, compact },
+  { nodes, onEdit, onDelete, onAddChild, onNodeMove, onReparent, onLineAdjust, onLineReset, highlightedId, readOnly, compact },
   forwardedRef
 ) {
   const dragState = useRef<{ id: string; offsetX: number; offsetY: number; blockedIds: Set<string> } | null>(null);
-  const lineDragState = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
+  // offsetX/offsetY here are the pointer's distance from the CURRENT absolute bend point at
+  // drag start; defaultAtStart lets each move re-derive a fresh offset-from-default as the
+  // connected cards' positions (and therefore the natural midpoint) can differ frame to frame.
+  const lineDragState = useRef<{ id: string; grabOffsetX: number; grabOffsetY: number } | null>(null);
   const [, forceRerender] = useState(0);
   const [hoverTargetId, setHoverTargetId] = useState<string | null>(null);
   const CARD_H = compact ? CARD_H_COMPACT : CARD_H_FULL;
@@ -74,22 +78,50 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
 
+  // The connector's natural (no manual bend) midpoint, recomputed from the two cards'
+  // LIVE positions — this is what a stored offset is relative to.
+  function getDefaultMid(node: OrgNode): { x: number; y: number } | null {
+    if (!node.parentId) return null;
+    const parent = nodesById.get(node.parentId);
+    if (!parent) return null;
+    const x1 = parent.freeX + CARD_W / 2;
+    const y1 = parent.freeY + CARD_H;
+    const x2 = node.freeX + CARD_W / 2;
+    const y2 = node.freeY;
+    return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+  }
+
   function handleLinePointerDown(e: React.PointerEvent, nodeId: string, midX: number, midY: number) {
     if (readOnly) return;
     e.preventDefault();
     e.stopPropagation();
     document.body.style.userSelect = "none";
-    lineDragState.current = { id: nodeId, offsetX: e.clientX - midX, offsetY: e.clientY - midY };
+    lineDragState.current = { id: nodeId, grabOffsetX: e.clientX - midX, grabOffsetY: e.clientY - midY };
     (e.target as SVGElement).setPointerCapture(e.pointerId);
+  }
+
+  function handleLineDoubleClick(e: React.MouseEvent, nodeId: string) {
+    if (readOnly) return;
+    e.stopPropagation();
+    const node = nodesById.get(nodeId);
+    if (node) {
+      node.lineOffsetX = undefined;
+      node.lineOffsetY = undefined;
+      forceRerender((v) => v + 1);
+    }
+    onLineReset?.(nodeId);
   }
 
   function handlePointerMove(e: React.PointerEvent) {
     const lineDrag = lineDragState.current;
     if (lineDrag) {
       const node = nodesById.get(lineDrag.id);
-      if (node) {
-        node.lineMidX = e.clientX - lineDrag.offsetX;
-        node.lineMidY = e.clientY - lineDrag.offsetY;
+      const defaultMid = node ? getDefaultMid(node) : null;
+      if (node && defaultMid) {
+        const absMidX = e.clientX - lineDrag.grabOffsetX;
+        const absMidY = e.clientY - lineDrag.grabOffsetY;
+        node.lineOffsetX = absMidX - defaultMid.x;
+        node.lineOffsetY = absMidY - defaultMid.y;
         forceRerender((v) => v + 1);
       }
       return;
@@ -123,8 +155,8 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
     if (lineDragState.current) {
       const drag = lineDragState.current;
       const node = nodesById.get(drag.id);
-      if (node && node.lineMidX !== undefined && node.lineMidY !== undefined) {
-        onLineAdjust?.(node.id, node.lineMidX, node.lineMidY);
+      if (node && node.lineOffsetX !== undefined && node.lineOffsetY !== undefined) {
+        onLineAdjust?.(node.id, node.lineOffsetX, node.lineOffsetY);
       }
       document.body.style.userSelect = "";
       lineDragState.current = null;
@@ -172,8 +204,8 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
           const y1 = parent.freeY + CARD_H;
           const x2 = node.freeX + CARD_W / 2;
           const y2 = node.freeY;
-          const midX = node.lineMidX ?? (x1 + x2) / 2;
-          const midY = node.lineMidY ?? (y1 + y2) / 2;
+          const midX = (x1 + x2) / 2 + (node.lineOffsetX ?? 0);
+          const midY = (y1 + y2) / 2 + (node.lineOffsetY ?? 0);
           return (
             <g key={node.id}>
               <path d={`M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`} fill="none" stroke="rgba(100,116,139,0.35)" strokeWidth={2} />
@@ -181,13 +213,14 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
                 <circle
                   cx={midX}
                   cy={midY}
-                  r={5}
+                  r={7}
                   className="fill-white stroke-sky-400 hover:fill-sky-100"
                   strokeWidth={2}
                   style={{ pointerEvents: "auto", cursor: "grab", touchAction: "none" }}
                   onPointerDown={(e) => handleLinePointerDown(e, node.id, midX, midY)}
+                  onDoubleClick={(e) => handleLineDoubleClick(e, node.id)}
                 >
-                  <title>Arrastra para curvar esta conexión</title>
+                  <title>Arrastra para curvar esta conexión (doble clic para restablecer)</title>
                 </circle>
               )}
             </g>

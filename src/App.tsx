@@ -103,8 +103,13 @@ export default function App() {
     pushToast("Jefe directo reasignado");
   }
 
-  function handleLineAdjust(id: string, midX: number, midY: number) {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, lineMidX: midX, lineMidY: midY } : n)));
+  function handleLineAdjust(id: string, offsetX: number, offsetY: number) {
+    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, lineOffsetX: offsetX, lineOffsetY: offsetY } : n)));
+    setDirty(true);
+  }
+
+  function handleLineReset(id: string) {
+    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, lineOffsetX: undefined, lineOffsetY: undefined } : n)));
     setDirty(true);
   }
 
@@ -252,6 +257,7 @@ export default function App() {
             onMoveNode={handleMoveNode}
             onReparentNode={handleReparentNode}
             onLineAdjust={handleLineAdjust}
+            onLineReset={handleLineReset}
             onSave={handleSave}
             onCreateWorkCenter={handleCreateWorkCenter}
             onRenameWorkCenter={handleRenameWorkCenter}
