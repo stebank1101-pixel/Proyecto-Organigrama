@@ -425,6 +425,7 @@ export function OrgChartView({
                   onReparent={readOnly ? undefined : onReparentNode}
                   onLineAdjust={readOnly ? undefined : onLineAdjust}
                   onLineReset={readOnly ? undefined : onLineReset}
+                  onLineDelete={readOnly ? undefined : onLineDelete}
                   onCoordinationLink={readOnly ? undefined : onCoordinationLink}
                   onCoordinationStyleToggle={readOnly ? undefined : onCoordinationStyleToggle}
                   onCoordinationLineAdjust={readOnly ? undefined : onCoordinationLineAdjust}

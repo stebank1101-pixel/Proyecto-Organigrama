@@ -89,8 +89,22 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
   // grabOffsetX/Y is the pointer's distance from the CURRENT absolute bend point at drag
   // start; each move re-derives a fresh offset-from-default since the connected cards'
   // live positions (and therefore the natural midpoint) can shift frame to frame.
-  const lineDragState = useRef<{ id: string; grabOffsetX: number; grabOffsetY: number } | null>(null);
-  const coordLineDragState = useRef<{ id: string; targetId: string; grabOffsetX: number; grabOffsetY: number } | null>(null);
+  // startX/Y + moved let a plain click on the bend handle (no real drag) pass through as a
+  // no-op — otherwise an imprecise click meant for the neighboring delete/style button could
+  // nudge the curve by a stray pixel or two instead of doing nothing.
+  const lineDragState = useRef<{ id: string; grabOffsetX: number; grabOffsetY: number; startX: number; startY: number; moved: boolean } | null>(
+    null
+  );
+  const coordLineDragState = useRef<{
+    id: string;
+    targetId: string;
+    grabOffsetX: number;
+    grabOffsetY: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
+  const DRAG_THRESHOLD = 4;
   // Shift+drag (or Conectar líneas mode) from a card draws a dotted coordination line to
   // whatever card it's released on, instead of moving the card.
   const linkDragState = useRef<{ id: string } | null>(null);
@@ -224,7 +238,14 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     e.preventDefault();
     e.stopPropagation();
     document.body.style.userSelect = "none";
-    lineDragState.current = { id: nodeId, grabOffsetX: e.clientX - midX, grabOffsetY: e.clientY - midY };
+    lineDragState.current = {
+      id: nodeId,
+      grabOffsetX: e.clientX - midX,
+      grabOffsetY: e.clientY - midY,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+    };
     (e.target as SVGElement).setPointerCapture(e.pointerId);
   }
 
@@ -245,7 +266,15 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     e.preventDefault();
     e.stopPropagation();
     document.body.style.userSelect = "none";
-    coordLineDragState.current = { id: nodeId, targetId, grabOffsetX: e.clientX - midX, grabOffsetY: e.clientY - midY };
+    coordLineDragState.current = {
+      id: nodeId,
+      targetId,
+      grabOffsetX: e.clientX - midX,
+      grabOffsetY: e.clientY - midY,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+    };
     (e.target as SVGElement).setPointerCapture(e.pointerId);
   }
 
@@ -272,6 +301,8 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
 
     const coordDrag = coordLineDragState.current;
     if (coordDrag) {
+      if (!coordDrag.moved && Math.hypot(e.clientX - coordDrag.startX, e.clientY - coordDrag.startY) < DRAG_THRESHOLD) return;
+      coordDrag.moved = true;
       const node = nodesById.get(coordDrag.id);
       const target = nodesById.get(coordDrag.targetId);
       if (node && target) {
@@ -288,6 +319,8 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
 
     const lineDrag = lineDragState.current;
     if (lineDrag) {
+      if (!lineDrag.moved && Math.hypot(e.clientX - lineDrag.startX, e.clientY - lineDrag.startY) < DRAG_THRESHOLD) return;
+      lineDrag.moved = true;
       const node = nodesById.get(lineDrag.id);
       const defaultMid = node ? getDefaultMid(node) : null;
       if (node && defaultMid) {
@@ -423,7 +456,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
                     <title>Arrastra para curvar esta conexión (doble clic para restablecer)</title>
                   </circle>
                   <g
-                    transform={`translate(${midX + 18}, ${midY - 18})`}
+                    transform={`translate(${midX + 26}, ${midY - 26})`}
                     style={{ pointerEvents: "auto", cursor: "pointer" }}
                     onClick={() => onLineDelete?.(node.id)}
                   >
@@ -476,7 +509,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
                       <title>Arrastra para curvar esta línea de coordinación</title>
                     </circle>
                     <g
-                      transform={`translate(${midX - 20}, ${midY - 20})`}
+                      transform={`translate(${midX - 28}, ${midY - 28})`}
                       style={{ pointerEvents: "auto", cursor: "pointer" }}
                       onClick={() => onCoordinationStyleToggle?.(node.id, link.targetId)}
                     >
@@ -493,7 +526,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
                       <title>{link.style === "dashed" ? "Cambiar a línea continua" : "Cambiar a línea punteada"}</title>
                     </g>
                     <g
-                      transform={`translate(${midX + 20}, ${midY - 20})`}
+                      transform={`translate(${midX + 28}, ${midY - 28})`}
                       style={{ pointerEvents: "auto", cursor: "pointer" }}
                       onClick={() => onCoordinationUnlink?.(node.id, link.targetId)}
                     >
