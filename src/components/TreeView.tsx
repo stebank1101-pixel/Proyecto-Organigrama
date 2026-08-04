@@ -203,6 +203,61 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
   const [linkPreviewPos, setLinkPreviewPos] = useState<{ x: number; y: number } | null>(null);
   const [coordSize, setCoordSize] = useState({ width: 0, height: 0 });
 
+  // The chart is often much wider/taller than the viewport (many branches, or — like a
+  // broken hierarchy with an orphaned root — two trees far apart). Without auto-scroll, a
+  // drop target that's off-screen is simply unreachable: the cursor can't move past the
+  // edge of the browser window, so the drag looks "frozen" even though it's working.
+  const scrollAncestorRef = useRef<HTMLElement | null>(null);
+  const dragCursorPos = useRef<{ x: number; y: number } | null>(null);
+  const autoScrollRaf = useRef<number | null>(null);
+
+  function findScrollableAncestor(el: HTMLElement | null): HTMLElement | null {
+    let cur = el?.parentElement ?? null;
+    while (cur) {
+      const style = getComputedStyle(cur);
+      const canScrollX = cur.scrollWidth > cur.clientWidth && /(auto|scroll)/.test(style.overflowX);
+      const canScrollY = cur.scrollHeight > cur.clientHeight && /(auto|scroll)/.test(style.overflowY);
+      if (canScrollX || canScrollY) return cur;
+      cur = cur.parentElement;
+    }
+    return null;
+  }
+
+  function startAutoScroll() {
+    scrollAncestorRef.current = findScrollableAncestor(innerRef.current);
+    if (autoScrollRaf.current !== null) return;
+    const EDGE = 70;
+    const MAX_SPEED = 22;
+    function tick() {
+      const container = scrollAncestorRef.current;
+      const pos = dragCursorPos.current;
+      if (container && pos) {
+        const rect = container.getBoundingClientRect();
+        let dx = 0;
+        let dy = 0;
+        if (pos.x < rect.left + EDGE) dx = -MAX_SPEED * (1 - Math.max(0, pos.x - rect.left) / EDGE);
+        else if (pos.x > rect.right - EDGE) dx = MAX_SPEED * (1 - Math.max(0, rect.right - pos.x) / EDGE);
+        if (pos.y < rect.top + EDGE) dy = -MAX_SPEED * (1 - Math.max(0, pos.y - rect.top) / EDGE);
+        else if (pos.y > rect.bottom - EDGE) dy = MAX_SPEED * (1 - Math.max(0, rect.bottom - pos.y) / EDGE);
+        if (dx !== 0 || dy !== 0) {
+          container.scrollLeft += dx;
+          container.scrollTop += dy;
+          bumpTick((v) => v + 1);
+        }
+      }
+      autoScrollRaf.current = requestAnimationFrame(tick);
+    }
+    autoScrollRaf.current = requestAnimationFrame(tick);
+  }
+
+  function stopAutoScroll() {
+    if (autoScrollRaf.current !== null) {
+      cancelAnimationFrame(autoScrollRaf.current);
+      autoScrollRaf.current = null;
+    }
+    dragCursorPos.current = null;
+  }
+
   function setRefs(el: HTMLDivElement | null) {
     innerRef.current = el;
     if (typeof ref === "function") ref(el);
@@ -274,6 +329,8 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     };
   }, [nodes]);
 
+  useLayoutEffect(() => stopAutoScroll, []);
+
   function measureDefaultMid(nodeId: string, targetId: string): { x: number; y: number } | null {
     const containerEl = innerRef.current;
     if (!containerEl) return null;
@@ -303,12 +360,14 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
       linkDrag.current = { id: node.id };
       setLinkPreviewPos({ x: e.clientX, y: e.clientY });
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      startAutoScroll();
       return;
     }
 
     reparentDrag.current = { id: node.id, blockedIds: getDescendantIds(node.id, nodes) };
     setGhostPos({ x: e.clientX, y: e.clientY });
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    startAutoScroll();
   }
 
   function handleCoordBendPointerDown(e: React.PointerEvent, nodeId: string, targetId: string, midX: number, midY: number) {
@@ -318,6 +377,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     document.body.style.userSelect = "none";
     coordBendDrag.current = { id: nodeId, targetId, grabOffsetX: e.clientX - midX, grabOffsetY: e.clientY - midY };
     (e.target as SVGElement).setPointerCapture(e.pointerId);
+    startAutoScroll();
   }
 
   function hitTest(clientX: number, clientY: number): string | null {
@@ -326,6 +386,8 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
   }
 
   function handleContainerPointerMove(e: React.PointerEvent) {
+    dragCursorPos.current = { x: e.clientX, y: e.clientY };
+
     if (linkDrag.current) {
       setLinkPreviewPos({ x: e.clientX, y: e.clientY });
       const hovered = hitTest(e.clientX, e.clientY);
@@ -355,6 +417,8 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
   }
 
   function handleContainerPointerUp() {
+    stopAutoScroll();
+
     if (linkDrag.current) {
       if (linkHoverId) onCoordinationLink?.(linkDrag.current.id, linkHoverId);
       linkDrag.current = null;
