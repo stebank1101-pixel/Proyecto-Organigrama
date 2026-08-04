@@ -47,19 +47,20 @@ body {
   @apply rounded-md p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40;
 }
 
-/* Classic CSS-only hierarchical org chart connectors */
-.org-tree ul {
+/* Classic CSS-only hierarchical org chart connectors, used only for the top "spine":
+   the root(s) and their direct children (e.g. department heads) laid out side by side. */
+.org-spine-row {
   position: relative;
   display: flex;
   justify-content: center;
   padding-top: 32px;
 }
 
-.org-tree > ul {
+.org-tree > .org-spine-row {
   padding-top: 0;
 }
 
-.org-tree li {
+.org-spine-item {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -68,12 +69,12 @@ body {
   padding: 32px 14px 0 14px;
 }
 
-.org-tree > ul > li {
+.org-tree > .org-spine-row > .org-spine-item {
   padding-top: 0;
 }
 
-.org-tree li::before,
-.org-tree li::after {
+.org-spine-item::before,
+.org-spine-item::after {
   content: "";
   position: absolute;
   top: 0;
@@ -83,44 +84,44 @@ body {
   border-top: 2px solid rgba(100, 116, 139, 0.3);
 }
 
-.org-tree li::after {
+.org-spine-item::after {
   right: auto;
   left: 50%;
   border-left: 2px solid rgba(100, 116, 139, 0.3);
 }
 
-.org-tree > ul > li::before,
-.org-tree > ul > li::after {
+.org-tree > .org-spine-row > .org-spine-item::before,
+.org-tree > .org-spine-row > .org-spine-item::after {
   display: none;
 }
 
-.org-tree li:only-child::before,
-.org-tree li:only-child::after {
+.org-spine-item:only-child::before,
+.org-spine-item:only-child::after {
   display: none;
 }
 
-.org-tree li:only-child {
+.org-spine-item:only-child {
   padding-top: 0;
 }
 
-.org-tree li:first-child::before {
+.org-spine-item:first-child::before {
   border: none;
 }
 
-.org-tree li:last-child::after {
+.org-spine-item:last-child::after {
   border: none;
 }
 
-.org-tree li:last-child::before {
+.org-spine-item:last-child::before {
   border-right: 2px solid rgba(100, 116, 139, 0.3);
   border-radius: 0 6px 0 0;
 }
 
-.org-tree li:first-child::after {
+.org-spine-item:first-child::after {
   border-radius: 6px 0 0 0;
 }
 
-.org-tree ul ul::before {
+.org-spine-row .org-spine-row::before {
   content: "";
   position: absolute;
   top: 0;
@@ -128,4 +129,55 @@ body {
   width: 0;
   height: 32px;
   border-left: 2px solid rgba(100, 116, 139, 0.3);
+}
+
+/* Past the spine: each branch stacks vertically (one report per row) with an
+   L-shaped connector instead of spreading into new horizontal columns. */
+.org-vbranch-list {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 20px 0 0 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.org-vbranch-list::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 30px;
+  width: 0;
+  height: 20px;
+  border-left: 2px solid rgba(100, 116, 139, 0.3);
+}
+
+.org-vbranch-item {
+  position: relative;
+  padding-left: 26px;
+}
+
+.org-vbranch-item::before {
+  content: "";
+  position: absolute;
+  top: 34px;
+  left: 0;
+  width: 26px;
+  height: 0;
+  border-top: 2px solid rgba(100, 116, 139, 0.3);
+}
+
+.org-vbranch-item::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-left: 2px solid rgba(100, 116, 139, 0.3);
+}
+
+.org-vbranch-item:last-child::after {
+  bottom: auto;
+  height: 34px;
 }

@@ -7,12 +7,13 @@ import { TreeView } from "./TreeView";
 interface AllCentersOverviewProps {
   nodes: OrgNode[];
   allSedes: string[];
+  compact?: boolean;
 }
 
 function noop() {}
 
 export const AllCentersOverview = forwardRef<HTMLDivElement, AllCentersOverviewProps>(function AllCentersOverview(
-  { nodes, allSedes },
+  { nodes, allSedes, compact },
   ref
 ) {
   const groups = groupNodesBySede(nodes, allSedes);
@@ -32,7 +33,7 @@ export const AllCentersOverview = forwardRef<HTMLDivElement, AllCentersOverviewP
             <p className="text-xs text-slate-400">Sin colaboradores en este centro.</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-slate-100 bg-slate-50/50">
-              <TreeView nodes={group.nodes} onEdit={noop} onDelete={noop} onAddChild={noop} readOnly />
+              <TreeView nodes={group.nodes} onEdit={noop} onDelete={noop} onAddChild={noop} readOnly compact={compact} />
             </div>
           )}
         </div>

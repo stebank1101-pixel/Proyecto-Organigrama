@@ -3,7 +3,8 @@ import type { OrgNode } from "../types";
 import { NodeCard } from "./NodeCard";
 
 const CARD_W = 240;
-const CARD_H = 188;
+const CARD_H_FULL = 188;
+const CARD_H_COMPACT = 92;
 const PADDING = 260;
 
 interface FreeViewProps {
@@ -14,14 +15,16 @@ interface FreeViewProps {
   onNodeMove: (id: string, x: number, y: number) => void;
   highlightedId?: string | null;
   readOnly?: boolean;
+  compact?: boolean;
 }
 
 export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeView(
-  { nodes, onEdit, onDelete, onAddChild, onNodeMove, highlightedId, readOnly },
+  { nodes, onEdit, onDelete, onAddChild, onNodeMove, highlightedId, readOnly, compact },
   forwardedRef
 ) {
   const dragState = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
   const [, forceRerender] = useState(0);
+  const CARD_H = compact ? CARD_H_COMPACT : CARD_H_FULL;
 
   const nodesById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
@@ -33,7 +36,7 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
       maxY = Math.max(maxY, n.freeY + CARD_H);
     }
     return { width: maxX + PADDING, height: maxY + PADDING };
-  }, [nodes]);
+  }, [nodes, CARD_H]);
 
   function handlePointerDown(e: React.PointerEvent, node: OrgNode) {
     if (readOnly) return;
@@ -124,6 +127,7 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
             onAddChild={onAddChild}
             highlighted={highlightedId === node.id}
             readOnly={readOnly}
+            compact={compact}
           />
         </div>
       ))}

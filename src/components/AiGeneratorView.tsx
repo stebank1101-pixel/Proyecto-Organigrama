@@ -204,8 +204,8 @@ export function AiGeneratorView({ nodes, workCenters, onApply, readOnly }: AiGen
                   <OrgIcon name={node.iconName} className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-medium text-slate-800">{node.name}</p>
-                  <p className="truncate text-[11px] text-slate-500">{node.title}</p>
+                  <p className="truncate text-xs font-medium text-slate-800">{node.title}</p>
+                  <p className="truncate text-[11px] text-slate-500">{node.department}</p>
                 </div>
               </div>
             ))}

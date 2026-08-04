@@ -1,6 +1,19 @@
 import { toPng, toSvg } from "html-to-image";
 import { jsPDF } from "jspdf";
-import { ArrowLeft, Building2, Download, FileImage, FileText, ListTree, Network, Plus, Save, Search, Settings } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  Download,
+  FileImage,
+  FileText,
+  IdCard,
+  ListTree,
+  Network,
+  Plus,
+  Save,
+  Search,
+  Settings,
+} from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { computeAllSedes, computeWorkCenterRows, type CenterSelection } from "../lib/workCenters";
 import type { OrgNode, ViewMode, WorkCenter } from "../types";
@@ -80,6 +93,9 @@ export function OrgChartView({
 }: OrgChartViewProps) {
   const [selectedCenter, setSelectedCenter] = useState<CenterSelection>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("tree");
+  // Compact shows only area + cargo per box; detailed reveals the rest of the node's
+  // data (contact info, badges, metrics) for whoever needs it later. Remembered per browser.
+  const [compact, setCompact] = useState(() => localStorage.getItem("orgcraft.compactCards") !== "false");
   const [deptFilter, setDeptFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [modalState, setModalState] = useState<{
@@ -188,6 +204,14 @@ export function OrgChartView({
   function confirmDelete() {
     if (deleteTarget) onDeleteNode(deleteTarget.id);
     setDeleteTarget(null);
+  }
+
+  function toggleCompact() {
+    setCompact((prev) => {
+      const next = !prev;
+      localStorage.setItem("orgcraft.compactCards", String(next));
+      return next;
+    });
   }
 
   async function handleRenameCenter(oldName: string, newName: string) {
@@ -306,6 +330,15 @@ export function OrgChartView({
                   <Plus className="h-3.5 w-3.5" /> Nuevo nodo
                 </button>
               )}
+              <button
+                onClick={toggleCompact}
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                  compact ? "border-sky-200 bg-sky-50 text-sky-700" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                }`}
+                title={compact ? "Mostrando solo área y cargo" : "Mostrando toda la información del cargo"}
+              >
+                <IdCard className="h-3.5 w-3.5" /> {compact ? "Vista compacta" : "Vista detallada"}
+              </button>
               <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
                 <button disabled={exporting} onClick={() => exportAs("png")} className="icon-btn" title="Exportar PNG">
                   <FileImage className="h-3.5 w-3.5" />
@@ -372,7 +405,7 @@ export function OrgChartView({
           >
             <div style={{ padding: PAN_PADDING }} className="inline-block min-w-full">
               {selectedCenter === "ALL" ? (
-                <AllCentersOverview ref={contentRef} nodes={nodes} allSedes={allSedes} />
+                <AllCentersOverview ref={contentRef} nodes={nodes} allSedes={allSedes} compact={compact} />
               ) : viewMode === "tree" ? (
                 <TreeView
                   ref={contentRef}
@@ -381,6 +414,7 @@ export function OrgChartView({
                   onDelete={setDeleteTarget}
                   onAddChild={(p) => openCreate(p.id)}
                   readOnly={readOnly}
+                  compact={compact}
                 />
               ) : (
                 <FreeView
@@ -391,6 +425,7 @@ export function OrgChartView({
                   onAddChild={(p) => openCreate(p.id)}
                   onNodeMove={onMoveNode}
                   readOnly={readOnly}
+                  compact={compact}
                 />
               )}
             </div>

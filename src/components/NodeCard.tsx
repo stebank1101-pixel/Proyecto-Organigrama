@@ -40,9 +40,12 @@ interface NodeCardProps {
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   highlighted?: boolean;
   readOnly?: boolean;
+  /** Compact shows only area + cargo; the rest of the node's data still exists underneath
+   * and can be revealed by switching to the detailed view (see the toolbar toggle). */
+  compact?: boolean;
 }
 
-export function NodeCard({ node, onEdit, onDelete, onAddChild, dragHandleProps, highlighted, readOnly }: NodeCardProps) {
+export function NodeCard({ node, onEdit, onDelete, onAddChild, dragHandleProps, highlighted, readOnly, compact }: NodeCardProps) {
   const style = ROLE_STYLES[node.roleType];
   const textStyle: React.CSSProperties | undefined = node.textColor ? { color: node.textColor } : undefined;
   const mutedTextStyle: React.CSSProperties | undefined = node.textColor ? { color: node.textColor, opacity: 0.75 } : undefined;
@@ -78,25 +81,27 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, dragHandleProps, 
       />
 
       <div className="flex items-start gap-2.5 pt-1">
-        <img
-          src={node.avatar || "https://api.dicebear.com/9.x/initials/svg?seed=" + encodeURIComponent(node.title || "?")}
-          alt={node.name || node.title}
-          className="h-11 w-11 flex-shrink-0 rounded-full border border-slate-200 object-cover"
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src = "https://api.dicebear.com/9.x/initials/svg?seed=" + encodeURIComponent(node.name || node.title || "?");
-          }}
-        />
+        {!compact && (
+          <img
+            src={node.avatar || "https://api.dicebear.com/9.x/initials/svg?seed=" + encodeURIComponent(node.title || "?")}
+            alt={node.name || node.title}
+            className="h-11 w-11 flex-shrink-0 rounded-full border border-slate-200 object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = "https://api.dicebear.com/9.x/initials/svg?seed=" + encodeURIComponent(node.name || node.title || "?");
+            }}
+          />
+        )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-slate-900" style={textStyle} title={node.title}>
-            {node.title}
+            {node.title || "Cargo sin definir"}
           </p>
-          <p className="truncate text-xs text-slate-500" style={mutedTextStyle} title={node.name || "Vacante"}>
-            {node.name || "Vacante"}
+          <p className="truncate text-xs text-slate-500" style={mutedTextStyle} title={compact ? node.department : node.name || "Vacante"}>
+            {compact ? node.department || "Área sin asignar" : node.name || "Vacante"}
           </p>
         </div>
       </div>
 
-      {node.assignees && node.assignees.length > 0 && (
+      {!compact && node.assignees && node.assignees.length > 0 && (
         <div className="mt-2 flex items-center gap-1" title={node.assignees.map((a) => a.name).filter(Boolean).join(", ")}>
           <div className="flex -space-x-2">
             {node.assignees.slice(0, 4).map((a) => (
@@ -114,34 +119,40 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, dragHandleProps, 
         </div>
       )}
 
-      <div className="mt-2 flex flex-wrap items-center gap-1">
-        <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${style.badge}`}>{ROLE_LABEL[node.roleType]}</span>
-        {node.customBadge && (
-          <span className="truncate rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-500">
-            {node.customBadge}
+      {!compact && (
+        <div className="mt-2 flex flex-wrap items-center gap-1">
+          <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${style.badge}`}>{ROLE_LABEL[node.roleType]}</span>
+          {node.customBadge && (
+            <span className="truncate rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-500">
+              {node.customBadge}
+            </span>
+          )}
+        </div>
+      )}
+
+      {!compact && (
+        <div className="mt-2 space-y-0.5 text-[11px] text-slate-500" style={mutedTextStyle}>
+          <p className="truncate">{node.department} · {node.sede}</p>
+          <p className="flex items-center gap-1 truncate">
+            <Mail className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">{node.email}</span>
+          </p>
+          <p className="flex items-center gap-1">
+            <Phone className="h-3 w-3 flex-shrink-0" />
+            {node.phone}
+          </p>
+        </div>
+      )}
+
+      {!compact && (
+        <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-600" style={mutedTextStyle}>
+          <span className="flex items-center gap-1">
+            <Users2 className="h-3 w-3" />
+            {node.metrics?.headcount ?? 0}
           </span>
-        )}
-      </div>
-
-      <div className="mt-2 space-y-0.5 text-[11px] text-slate-500" style={mutedTextStyle}>
-        <p className="truncate">{node.department} · {node.sede}</p>
-        <p className="flex items-center gap-1 truncate">
-          <Mail className="h-3 w-3 flex-shrink-0" />
-          <span className="truncate">{node.email}</span>
-        </p>
-        <p className="flex items-center gap-1">
-          <Phone className="h-3 w-3 flex-shrink-0" />
-          {node.phone}
-        </p>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-600" style={mutedTextStyle}>
-        <span className="flex items-center gap-1">
-          <Users2 className="h-3 w-3" />
-          {node.metrics?.headcount ?? 0}
-        </span>
-        <span>{node.metrics?.budget}</span>
-      </div>
+          <span>{node.metrics?.budget}</span>
+        </div>
+      )}
 
       {!readOnly && (
         <div className="pointer-events-none absolute inset-x-0 -bottom-3 flex justify-center gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">

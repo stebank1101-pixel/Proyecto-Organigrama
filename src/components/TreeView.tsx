@@ -2,45 +2,93 @@ import { forwardRef, useMemo } from "react";
 import type { OrgNode } from "../types";
 import { NodeCard } from "./NodeCard";
 
-interface TreeViewProps {
-  nodes: OrgNode[];
+interface TreeHandlers {
   onEdit: (node: OrgNode) => void;
   onDelete: (node: OrgNode) => void;
   onAddChild: (parent: OrgNode) => void;
   highlightedId?: string | null;
   readOnly?: boolean;
+  compact?: boolean;
 }
 
-function TreeBranch({
+interface TreeViewProps extends TreeHandlers {
+  nodes: OrgNode[];
+}
+
+function Card({ node, ...handlers }: { node: OrgNode } & TreeHandlers) {
+  return (
+    <div className="inline-block">
+      <NodeCard
+        node={node}
+        onEdit={handlers.onEdit}
+        onDelete={handlers.onDelete}
+        onAddChild={handlers.onAddChild}
+        highlighted={handlers.highlightedId === node.id}
+        readOnly={handlers.readOnly}
+        compact={handlers.compact}
+      />
+    </div>
+  );
+}
+
+// Past the spine, every branch stacks vertically (one report per row, joined by an
+// L-connector) instead of opening new horizontal columns, so deep branches grow
+// downward instead of stretching the whole chart sideways.
+function VerticalBranch({
   node,
   childrenByParent,
   ...handlers
-}: {
-  node: OrgNode;
-  childrenByParent: Map<string, OrgNode[]>;
-  onEdit: (node: OrgNode) => void;
-  onDelete: (node: OrgNode) => void;
-  onAddChild: (parent: OrgNode) => void;
-  highlightedId?: string | null;
-  readOnly?: boolean;
-}) {
+}: { node: OrgNode; childrenByParent: Map<string, OrgNode[]> } & TreeHandlers) {
   const children = childrenByParent.get(node.id) || [];
   return (
-    <li>
-      <div className="inline-block">
-        <NodeCard
-          node={node}
-          onEdit={handlers.onEdit}
-          onDelete={handlers.onDelete}
-          onAddChild={handlers.onAddChild}
-          highlighted={handlers.highlightedId === node.id}
-          readOnly={handlers.readOnly}
-        />
-      </div>
+    <li className="org-vbranch-item">
+      <Card node={node} {...handlers} />
       {children.length > 0 && (
-        <ul>
+        <ul className="org-vbranch-list">
           {children.map((child) => (
-            <TreeBranch key={child.id} node={child} childrenByParent={childrenByParent} {...handlers} />
+            <VerticalBranch key={child.id} node={child} childrenByParent={childrenByParent} {...handlers} />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+// A root's direct children (departments) form the horizontal spine row; everything
+// each one leads to renders as a vertical branch column beneath it.
+function SpineColumn({
+  node,
+  childrenByParent,
+  ...handlers
+}: { node: OrgNode; childrenByParent: Map<string, OrgNode[]> } & TreeHandlers) {
+  const children = childrenByParent.get(node.id) || [];
+  return (
+    <li className="org-spine-item">
+      <Card node={node} {...handlers} />
+      {children.length > 0 && (
+        <ul className="org-vbranch-list">
+          {children.map((child) => (
+            <VerticalBranch key={child.id} node={child} childrenByParent={childrenByParent} {...handlers} />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+function RootBranch({
+  node,
+  childrenByParent,
+  ...handlers
+}: { node: OrgNode; childrenByParent: Map<string, OrgNode[]> } & TreeHandlers) {
+  const children = childrenByParent.get(node.id) || [];
+  return (
+    <li className="org-spine-item">
+      <Card node={node} {...handlers} />
+      {children.length > 0 && (
+        <ul className="org-spine-row">
+          {children.map((child) => (
+            <SpineColumn key={child.id} node={child} childrenByParent={childrenByParent} {...handlers} />
           ))}
         </ul>
       )}
@@ -49,7 +97,7 @@ function TreeBranch({
 }
 
 export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeView(
-  { nodes, onEdit, onDelete, onAddChild, highlightedId, readOnly },
+  { nodes, onEdit, onDelete, onAddChild, highlightedId, readOnly, compact },
   ref
 ) {
   const { roots, childrenByParent } = useMemo(() => {
@@ -76,20 +124,13 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     );
   }
 
+  const handlers = { onEdit, onDelete, onAddChild, highlightedId, readOnly, compact };
+
   return (
     <div ref={ref} className="org-tree min-w-max px-10 py-8">
-      <ul>
+      <ul className="org-spine-row">
         {roots.map((root) => (
-          <TreeBranch
-            key={root.id}
-            node={root}
-            childrenByParent={childrenByParent}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onAddChild={onAddChild}
-            highlightedId={highlightedId}
-            readOnly={readOnly}
-          />
+          <RootBranch key={root.id} node={root} childrenByParent={childrenByParent} {...handlers} />
         ))}
       </ul>
     </div>
