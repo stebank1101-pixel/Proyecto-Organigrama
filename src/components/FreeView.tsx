@@ -408,8 +408,8 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
                 <path
                   d={`M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`}
                   fill="none"
-                  stroke="rgba(100,116,139,0.55)"
-                  strokeWidth={1.5}
+                  stroke="rgba(168,85,247,0.7)"
+                  strokeWidth={2}
                   strokeDasharray={link.style === "dashed" ? "6 4" : undefined}
                 />
                 {!readOnly && (
