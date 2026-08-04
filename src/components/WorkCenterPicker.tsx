@@ -60,8 +60,8 @@ export function WorkCenterPicker({ rows, readOnly, error, onSelect, onSelectAll,
               onClick={() => onSelect(row.name)}
               className="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:shadow-md"
             >
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600">
-                <Building2 className="h-4 w-4" />
+              <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-slate-600">
+                {row.icon ? <img src={row.icon} alt="" className="h-full w-full object-cover" /> : <Building2 className="h-4 w-4" />}
               </div>
               <p className="truncate text-sm font-semibold text-slate-800">{row.name}</p>
               <p className="text-[11px] text-slate-400">

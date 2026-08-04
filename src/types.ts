@@ -20,6 +20,7 @@ export interface WorkCenter {
   phone: string;
   headcount: number;
   budget: string;
+  icon?: string;
 }
 
 export interface OrgNode {

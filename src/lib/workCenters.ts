@@ -10,6 +10,7 @@ export interface WorkCenterRow {
   phone: string;
   headcount: number;
   budget: string;
+  icon: string;
 }
 
 export interface SedeGroup {
@@ -46,6 +47,7 @@ export function computeWorkCenterRows(nodes: OrgNode[], workCenters: WorkCenter[
       phone: profile?.phone ?? "",
       headcount: profile?.headcount ?? 0,
       budget: profile?.budget ?? "",
+      icon: profile?.icon ?? "",
     };
   });
 }

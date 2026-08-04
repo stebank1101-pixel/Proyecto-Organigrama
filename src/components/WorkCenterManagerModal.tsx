@@ -1,5 +1,5 @@
-import { AlertTriangle, ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, ChevronDown, ChevronRight, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { useRef, useState } from "react";
 import type { WorkCenterRow } from "../lib/workCenters";
 import type { OrgNode } from "../types";
 
@@ -9,6 +9,7 @@ interface ProfileDraft {
   phone: string;
   headcount: string;
   budget: string;
+  icon: string;
 }
 
 interface WorkCenterManagerModalProps {
@@ -21,7 +22,10 @@ interface WorkCenterManagerModalProps {
   onCreate: (name: string) => void;
   onRename: (oldName: string, newName: string) => void;
   onDelete: (name: string) => void;
-  onUpdateProfile: (name: string, profile: { address: string; email: string; phone: string; headcount: number; budget: string }) => void;
+  onUpdateProfile: (
+    name: string,
+    profile: { address: string; email: string; phone: string; headcount: number; budget: string; icon: string }
+  ) => void;
   onEditNode: (node: OrgNode) => void;
   onCreateNode: (sedeName: string) => void;
   onDeleteNode: (node: OrgNode) => void;
@@ -47,8 +51,16 @@ export function WorkCenterManagerModal({
   const [editingValue, setEditingValue] = useState("");
   const [expandedName, setExpandedName] = useState<string | null>(null);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
+
+  function handleIconFile(file: File | undefined) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setProfileDraft((d) => (d ? { ...d, icon: reader.result as string } : d));
+    reader.readAsDataURL(file);
+  }
 
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -85,6 +97,7 @@ export function WorkCenterManagerModal({
       phone: c.phone,
       headcount: c.headcount ? String(c.headcount) : "",
       budget: c.budget,
+      icon: c.icon,
     });
   }
 
@@ -96,6 +109,7 @@ export function WorkCenterManagerModal({
       phone: profileDraft.phone,
       headcount: Number(profileDraft.headcount) || 0,
       budget: profileDraft.budget,
+      icon: profileDraft.icon,
     });
   }
 
@@ -187,6 +201,51 @@ export function WorkCenterManagerModal({
                   <div className="space-y-3 border-t border-slate-100 bg-slate-50 p-3">
                     <div>
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ficha del centro</p>
+
+                      <div className="mb-2 flex items-center gap-2">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white">
+                          {profileDraft?.icon ? (
+                            <img src={profileDraft.icon} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="text-[10px] text-slate-300">Sin ícono</span>
+                          )}
+                        </div>
+                        {!readOnly && (
+                          <>
+                            <input
+                              className="input flex-1"
+                              placeholder="URL de imagen (https://...)"
+                              value={profileDraft?.icon ?? ""}
+                              onChange={(e) => setProfileDraft((d) => (d ? { ...d, icon: e.target.value } : d))}
+                            />
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => handleIconFile(e.target.files?.[0])}
+                            />
+                            <button
+                              type="button"
+                              className="icon-btn flex-shrink-0 border border-slate-200"
+                              title="Subir imagen desde el PC"
+                              onClick={() => fileInputRef.current?.click()}
+                            >
+                              <Upload className="h-3.5 w-3.5" />
+                            </button>
+                            {profileDraft?.icon && (
+                              <button
+                                type="button"
+                                className="flex-shrink-0 text-[11px] text-rose-500 hover:underline"
+                                onClick={() => setProfileDraft((d) => (d ? { ...d, icon: "" } : d))}
+                              >
+                                Quitar
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+
                       <div className="grid grid-cols-2 gap-2">
                         <input
                           className="input"

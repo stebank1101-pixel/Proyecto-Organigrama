@@ -153,10 +153,11 @@ interface WorkCenterRecord {
   phone: string;
   headcount: number;
   budget: string;
+  icon: string;
 }
 
 function blankCenter(name: string): WorkCenterRecord {
-  return { name, address: "", email: "", phone: "", headcount: 0, budget: "" };
+  return { name, address: "", email: "", phone: "", headcount: 0, budget: "", icon: "" };
 }
 
 let inMemoryWorkCenters: WorkCenterRecord[] = [];
@@ -171,7 +172,8 @@ async function loadWorkCenters(): Promise<WorkCenterRecord[]> {
     email: row.email || "",
     phone: row.phone || "",
     headcount: row.headcount || 0,
-    budget: row.budget || ""
+    budget: row.budget || "",
+    icon: row.icon || ""
   }));
 }
 
@@ -627,14 +629,15 @@ app.put("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
 
 app.patch("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
   const name = decodeURIComponent(req.params.name);
-  const { address, email, phone, headcount, budget } = req.body || {};
+  const { address, email, phone, headcount, budget, icon } = req.body || {};
   try {
     await updateWorkCenterProfile(name, {
       ...(address !== undefined ? { address } : {}),
       ...(email !== undefined ? { email } : {}),
       ...(phone !== undefined ? { phone } : {}),
       ...(headcount !== undefined ? { headcount: Number(headcount) || 0 } : {}),
-      ...(budget !== undefined ? { budget } : {})
+      ...(budget !== undefined ? { budget } : {}),
+      ...(icon !== undefined ? { icon } : {})
     });
     res.json({ success: true });
   } catch (err: any) {
