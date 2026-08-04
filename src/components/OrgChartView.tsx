@@ -40,6 +40,9 @@ interface OrgChartViewProps {
   onReparentNode: (id: string, newParentId: string) => void;
   onLineAdjust: (id: string, offsetX: number, offsetY: number) => void;
   onLineReset: (id: string) => void;
+  onLineDelete: (id: string) => void;
+  onCoordinationLink: (id: string, targetId: string) => void;
+  onCoordinationUnlink: (id: string, targetId: string) => void;
   onSave: () => void;
   onCreateWorkCenter: (name: string) => Promise<boolean>;
   onRenameWorkCenter: (oldName: string, newName: string) => Promise<boolean>;
@@ -88,6 +91,9 @@ export function OrgChartView({
   onReparentNode,
   onLineAdjust,
   onLineReset,
+  onLineDelete,
+  onCoordinationLink,
+  onCoordinationUnlink,
   onSave,
   onCreateWorkCenter,
   onRenameWorkCenter,
@@ -404,7 +410,7 @@ export function OrgChartView({
 
           {viewMode === "free" && activeCenter && !readOnly && (
             <p className="border-b border-slate-200 bg-sky-50 px-4 py-1.5 text-[11px] text-sky-700">
-              Arrastra una tarjeta y suéltala sobre otra para reasignar su jefe directo. Arrastra el punto azul de una línea para curvarla; doble clic sobre el punto la restablece.
+              Arrastra una tarjeta sobre otra para reasignar su jefe directo, o haz clic en la "×" roja de una línea para quitarla. Mayús + arrastra entre dos tarjetas para crear una línea punteada de coordinación.
             </p>
           )}
 
@@ -439,6 +445,9 @@ export function OrgChartView({
                   onReparent={readOnly ? undefined : onReparentNode}
                   onLineAdjust={readOnly ? undefined : onLineAdjust}
                   onLineReset={readOnly ? undefined : onLineReset}
+                  onLineDelete={readOnly ? undefined : onLineDelete}
+                  onCoordinationLink={readOnly ? undefined : onCoordinationLink}
+                  onCoordinationUnlink={readOnly ? undefined : onCoordinationUnlink}
                   readOnly={readOnly}
                   compact={compact}
                 />

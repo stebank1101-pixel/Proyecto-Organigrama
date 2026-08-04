@@ -113,6 +113,32 @@ export default function App() {
     setDirty(true);
   }
 
+  function handleLineDelete(id: string) {
+    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId: null, lineOffsetX: undefined, lineOffsetY: undefined } : n)));
+    setDirty(true);
+    pushToast("Línea de jefe directo eliminada");
+  }
+
+  function handleCoordinationLink(id: string, targetId: string) {
+    setNodes((prev) =>
+      prev.map((n) => {
+        if (n.id !== id) return n;
+        const existing = n.coordinationLinks || [];
+        if (existing.includes(targetId)) return n;
+        return { ...n, coordinationLinks: [...existing, targetId] };
+      })
+    );
+    setDirty(true);
+    pushToast("Línea de coordinación agregada");
+  }
+
+  function handleCoordinationUnlink(id: string, targetId: string) {
+    setNodes((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, coordinationLinks: (n.coordinationLinks || []).filter((t) => t !== targetId) } : n))
+    );
+    setDirty(true);
+  }
+
   async function handleBulkUpdateNodes(updatedNodes: OrgNode[]) {
     setNodes(updatedNodes);
     setDirty(true);
@@ -258,6 +284,9 @@ export default function App() {
             onReparentNode={handleReparentNode}
             onLineAdjust={handleLineAdjust}
             onLineReset={handleLineReset}
+            onLineDelete={handleLineDelete}
+            onCoordinationLink={handleCoordinationLink}
+            onCoordinationUnlink={handleCoordinationUnlink}
             onSave={handleSave}
             onCreateWorkCenter={handleCreateWorkCenter}
             onRenameWorkCenter={handleRenameWorkCenter}
