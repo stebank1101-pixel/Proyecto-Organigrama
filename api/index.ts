@@ -839,7 +839,7 @@ ASEGÚRATE de que el primer nodo sea la máxima autoridad de este centro con par
       : sysPrompt;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-flash-latest",
       contents,
       config: {
         responseMimeType: "application/json"
