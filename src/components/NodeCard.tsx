@@ -55,8 +55,8 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, dragHandleProps, 
         <p className="truncate text-sm font-semibold text-slate-900" style={textStyle} title={node.title}>
           {node.title || "Cargo sin definir"}
         </p>
-        <p className="truncate text-xs text-slate-500" style={mutedTextStyle} title={compact ? node.department : node.name || "Vacante"}>
-          {compact ? node.department || "Área sin asignar" : node.name || "Vacante"}
+        <p className="truncate text-xs text-slate-500" style={mutedTextStyle} title={compact ? node.department : node.name}>
+          {compact ? node.department || "Área sin asignar" : node.name}
         </p>
       </div>
 
