@@ -7,6 +7,7 @@ import {
   FileImage,
   FileText,
   IdCard,
+  Link2,
   ListTree,
   Network,
   Plus,
@@ -42,6 +43,7 @@ interface OrgChartViewProps {
   onLineReset: (id: string) => void;
   onLineDelete: (id: string) => void;
   onCoordinationLink: (id: string, targetId: string) => void;
+  onCoordinationStyleToggle: (id: string, targetId: string) => void;
   onCoordinationUnlink: (id: string, targetId: string) => void;
   onSave: () => void;
   onCreateWorkCenter: (name: string) => Promise<boolean>;
@@ -93,6 +95,7 @@ export function OrgChartView({
   onLineReset,
   onLineDelete,
   onCoordinationLink,
+  onCoordinationStyleToggle,
   onCoordinationUnlink,
   onSave,
   onCreateWorkCenter,
@@ -108,6 +111,9 @@ export function OrgChartView({
   // Compact shows only area + cargo per box; detailed reveals the rest of the node's
   // data (contact info, badges, metrics) for whoever needs it later. Remembered per browser.
   const [compact, setCompact] = useState(() => localStorage.getItem("orgcraft.compactCards") !== "false");
+  // While on, dragging in Vista libre draws a coordination line instead of moving the card —
+  // an explicit toggle so the feature doesn't rely on discovering the Shift+drag shortcut.
+  const [linkMode, setLinkMode] = useState(false);
   const [deptFilter, setDeptFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [modalState, setModalState] = useState<{
@@ -136,6 +142,10 @@ export function OrgChartView({
     container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
     container.scrollTop = Math.max(0, PAN_PADDING - 24);
   }, [viewMode, selectedCenter, deptFilter, search]);
+
+  useEffect(() => {
+    setLinkMode(false);
+  }, [viewMode, selectedCenter]);
 
   useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
@@ -313,6 +323,18 @@ export function OrgChartView({
               </div>
             )}
 
+            {activeCenter && viewMode === "free" && !readOnly && (
+              <button
+                onClick={() => setLinkMode((v) => !v)}
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                  linkMode ? "border-purple-300 bg-purple-50 text-purple-700" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                }`}
+                title={linkMode ? "Arrastra entre dos tarjetas para crear una línea de coordinación" : "Activar para conectar tarjetas con una línea punteada"}
+              >
+                <Link2 className="h-3.5 w-3.5" /> {linkMode ? "Conectando..." : "Conectar líneas"}
+              </button>
+            )}
+
             {activeCenter && (
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -409,8 +431,10 @@ export function OrgChartView({
           </div>
 
           {viewMode === "free" && activeCenter && !readOnly && (
-            <p className="border-b border-slate-200 bg-sky-50 px-4 py-1.5 text-[11px] text-sky-700">
-              Arrastra una tarjeta sobre otra para reasignar su jefe directo, o haz clic en la "×" roja de una línea para quitarla. Mayús + arrastra entre dos tarjetas para crear una línea punteada de coordinación.
+            <p className={`border-b px-4 py-1.5 text-[11px] ${linkMode ? "border-purple-200 bg-purple-50 text-purple-700" : "border-slate-200 bg-sky-50 text-sky-700"}`}>
+              {linkMode
+                ? "Modo conectar activo: arrastra de una tarjeta a otra para crear una línea punteada de coordinación. Vuelve a hacer clic en \"Conectando...\" para salir."
+                : "Arrastra una tarjeta sobre otra para reasignar su jefe directo, o haz clic en la \"×\" roja de una línea para quitarla. Usa el botón \"Conectar líneas\" para crear conexiones de coordinación."}
             </p>
           )}
 
@@ -447,9 +471,11 @@ export function OrgChartView({
                   onLineReset={readOnly ? undefined : onLineReset}
                   onLineDelete={readOnly ? undefined : onLineDelete}
                   onCoordinationLink={readOnly ? undefined : onCoordinationLink}
+                  onCoordinationStyleToggle={readOnly ? undefined : onCoordinationStyleToggle}
                   onCoordinationUnlink={readOnly ? undefined : onCoordinationUnlink}
                   readOnly={readOnly}
                   compact={compact}
+                  linkMode={linkMode}
                 />
               )}
             </div>

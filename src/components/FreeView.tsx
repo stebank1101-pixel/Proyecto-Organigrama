@@ -35,10 +35,14 @@ interface FreeViewProps {
   onLineReset?: (id: string) => void;
   onLineDelete?: (id: string) => void;
   onCoordinationLink?: (id: string, targetId: string) => void;
+  onCoordinationStyleToggle?: (id: string, targetId: string) => void;
   onCoordinationUnlink?: (id: string, targetId: string) => void;
   highlightedId?: string | null;
   readOnly?: boolean;
   compact?: boolean;
+  /** When on, every drag creates a coordination line instead of moving the card
+   * (Shift+drag also works as a shortcut regardless of this toggle). */
+  linkMode?: boolean;
 }
 
 export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeView(
@@ -53,10 +57,12 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
     onLineReset,
     onLineDelete,
     onCoordinationLink,
+    onCoordinationStyleToggle,
     onCoordinationUnlink,
     highlightedId,
     readOnly,
     compact,
+    linkMode,
   },
   forwardedRef
 ) {
@@ -65,7 +71,8 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
   // start; each move re-derives a fresh offset-from-default since the connected cards'
   // live positions (and therefore the natural midpoint) can shift frame to frame.
   const lineDragState = useRef<{ id: string; grabOffsetX: number; grabOffsetY: number } | null>(null);
-  // Shift+drag from a card draws a dotted coordination line to whatever card it's released on.
+  // Shift+drag (or Conectar líneas mode) from a card draws a dotted coordination line to
+  // whatever card it's released on, instead of moving the card.
   const linkDragState = useRef<{ id: string } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [, forceRerender] = useState(0);
@@ -99,7 +106,7 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
     e.preventDefault();
     document.body.style.userSelect = "none";
 
-    if (e.shiftKey) {
+    if (e.shiftKey || linkMode) {
       linkDragState.current = { id: node.id };
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
       return;
@@ -306,10 +313,11 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
           );
         })}
 
-        {/* Dotted functional-coordination lines — independent of the reporting hierarchy. */}
+        {/* Functional-coordination lines — independent of the reporting hierarchy. Each
+            picks its own solid/dashed style (toggle button next to the delete button). */}
         {nodes.flatMap((node) =>
-          (node.coordinationLinks || []).map((targetId) => {
-            const target = nodesById.get(targetId);
+          (node.coordinationLinks || []).map((link) => {
+            const target = nodesById.get(link.targetId);
             if (!target) return null;
             const x1 = node.freeX + CARD_W / 2;
             const y1 = node.freeY + CARD_H / 2;
@@ -318,20 +326,47 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
             const midX = (x1 + x2) / 2;
             const midY = (y1 + y2) / 2;
             return (
-              <g key={`${node.id}->${targetId}`}>
-                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(100,116,139,0.55)" strokeWidth={1.5} strokeDasharray="6 4" />
+              <g key={`${node.id}->${link.targetId}`}>
+                <line
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke="rgba(100,116,139,0.55)"
+                  strokeWidth={1.5}
+                  strokeDasharray={link.style === "dashed" ? "6 4" : undefined}
+                />
                 {!readOnly && (
-                  <g
-                    transform={`translate(${midX}, ${midY})`}
-                    style={{ pointerEvents: "auto", cursor: "pointer" }}
-                    onClick={() => onCoordinationUnlink?.(node.id, targetId)}
-                  >
-                    <circle r={7} className="fill-white stroke-rose-400 hover:fill-rose-50" strokeWidth={2} />
-                    <text textAnchor="middle" dominantBaseline="central" fontSize={10} className="select-none fill-rose-500">
-                      ×
-                    </text>
-                    <title>Quitar esta línea de coordinación</title>
-                  </g>
+                  <>
+                    <g
+                      transform={`translate(${midX - 18}, ${midY})`}
+                      style={{ pointerEvents: "auto", cursor: "pointer" }}
+                      onClick={() => onCoordinationStyleToggle?.(node.id, link.targetId)}
+                    >
+                      <circle r={7} className="fill-white stroke-slate-400 hover:fill-slate-50" strokeWidth={2} />
+                      <line
+                        x1={-3.5}
+                        y1={0}
+                        x2={3.5}
+                        y2={0}
+                        stroke="rgb(100,116,139)"
+                        strokeWidth={1.5}
+                        strokeDasharray={link.style === "dashed" ? "2 1.5" : undefined}
+                      />
+                      <title>{link.style === "dashed" ? "Cambiar a línea continua" : "Cambiar a línea punteada"}</title>
+                    </g>
+                    <g
+                      transform={`translate(${midX + 18}, ${midY})`}
+                      style={{ pointerEvents: "auto", cursor: "pointer" }}
+                      onClick={() => onCoordinationUnlink?.(node.id, link.targetId)}
+                    >
+                      <circle r={7} className="fill-white stroke-rose-400 hover:fill-rose-50" strokeWidth={2} />
+                      <text textAnchor="middle" dominantBaseline="central" fontSize={10} className="select-none fill-rose-500">
+                        ×
+                      </text>
+                      <title>Quitar esta línea de coordinación</title>
+                    </g>
+                  </>
                 )}
               </g>
             );
@@ -363,7 +398,7 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
       {nodes.map((node) => (
         <div
           key={node.id}
-          className={`absolute transition-shadow ${readOnly ? "" : "cursor-grab active:cursor-grabbing"} ${
+          className={`absolute transition-shadow ${readOnly ? "" : linkMode ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"} ${
             dragState.current?.id === node.id ? "z-30 opacity-90 drop-shadow-lg" : ""
           } ${hoverTargetId === node.id ? "rounded-xl ring-4 ring-emerald-400 ring-offset-2" : ""} ${
             linkHoverId === node.id ? "rounded-xl ring-4 ring-purple-400 ring-offset-2" : ""

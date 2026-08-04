@@ -124,17 +124,34 @@ export default function App() {
       prev.map((n) => {
         if (n.id !== id) return n;
         const existing = n.coordinationLinks || [];
-        if (existing.includes(targetId)) return n;
-        return { ...n, coordinationLinks: [...existing, targetId] };
+        if (existing.some((link) => link.targetId === targetId)) return n;
+        return { ...n, coordinationLinks: [...existing, { targetId, style: "dashed" as const }] };
       })
     );
     setDirty(true);
     pushToast("Línea de coordinación agregada");
   }
 
+  function handleCoordinationStyleToggle(id: string, targetId: string) {
+    setNodes((prev) =>
+      prev.map((n) => {
+        if (n.id !== id) return n;
+        return {
+          ...n,
+          coordinationLinks: (n.coordinationLinks || []).map((link) =>
+            link.targetId === targetId ? { ...link, style: link.style === "dashed" ? "solid" : "dashed" } : link
+          ),
+        };
+      })
+    );
+    setDirty(true);
+  }
+
   function handleCoordinationUnlink(id: string, targetId: string) {
     setNodes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, coordinationLinks: (n.coordinationLinks || []).filter((t) => t !== targetId) } : n))
+      prev.map((n) =>
+        n.id === id ? { ...n, coordinationLinks: (n.coordinationLinks || []).filter((link) => link.targetId !== targetId) } : n
+      )
     );
     setDirty(true);
   }
@@ -286,6 +303,7 @@ export default function App() {
             onLineReset={handleLineReset}
             onLineDelete={handleLineDelete}
             onCoordinationLink={handleCoordinationLink}
+            onCoordinationStyleToggle={handleCoordinationStyleToggle}
             onCoordinationUnlink={handleCoordinationUnlink}
             onSave={handleSave}
             onCreateWorkCenter={handleCreateWorkCenter}

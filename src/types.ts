@@ -50,9 +50,10 @@ export interface OrgNode {
    * stays put as either connected card is dragged around. Undefined = no manual bend. */
   lineOffsetX?: number;
   lineOffsetY?: number;
-  /** IDs of other nodes this one has a dotted "functional coordination" line to —
-   * independent of the parentId hierarchy (a node can have several of these). */
-  coordinationLinks?: string[];
+  /** Other nodes this one has a "functional coordination" line to — independent of the
+   * parentId hierarchy (a node can have several of these). Each link picks its own
+   * solid/dashed style, same convention as the reference org chart's line legend. */
+  coordinationLinks?: { targetId: string; style: "solid" | "dashed" }[];
 }
 
 export interface FontOption {
