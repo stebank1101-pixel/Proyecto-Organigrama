@@ -142,6 +142,7 @@ export function generateAiOrg(payload: {
   companyType?: string;
   headcount?: number;
   targetSede: string;
+  image?: { mimeType: string; data: string } | null;
 }): Promise<{ success: boolean; nodes: OrgNode[] }> {
   return request("/api/ai/generate-org", {
     method: "POST",

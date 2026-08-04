@@ -785,12 +785,16 @@ app.get("/api/v1/integrations/logs", async (req, res) => {
 // Gemini AI Organigram Generator Endpoint
 app.post("/api/ai/generate-org", async (req, res) => {
   try {
-    const { prompt, companyType, headcount } = req.body;
+    const { prompt, companyType, headcount, image } = req.body;
     const targetSede = (req.body.targetSede || "").trim();
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!targetSede) {
       return res.status(400).json({ error: "Debes indicar el centro de trabajo (targetSede) para el que se generará el organigrama" });
+    }
+
+    if (image && (!image.mimeType || !image.data)) {
+      return res.status(400).json({ error: "El archivo adjunto es inválido" });
     }
 
     if (!apiKey) {
@@ -801,10 +805,16 @@ app.post("/api/ai/generate-org", async (req, res) => {
 
     const ai = new GoogleGenAI({ apiKey });
 
+    const sourceInstructions = image
+      ? `Se adjunta una imagen o documento (captura, foto o PDF) de un organigrama existente. Analiza cuidadosamente su contenido -cajas, jerarquía, líneas de dependencia, nombres y cargos visibles- y transcribe esa estructura real lo más fielmente posible.${
+          prompt ? ` Ten en cuenta también estas indicaciones adicionales del usuario: "${prompt}".` : ""
+        } Si algún nombre o dato no es legible, infiere un valor razonable en su lugar, pero respeta la jerarquía y los cargos que sí puedas leer.`
+      : `Empresa / Descripción: "${prompt || companyType || "Empresa tecnológica de rápido crecimiento"}"
+Número aproximado de nodos: ${headcount || 12}`;
+
     const sysPrompt = `Eres un consultor experto en diseño organizacional y estructuras jerárquicas empresariales corporativas.
 Genera una estructura de organigrama completa en formato JSON para el siguiente pedido:
-Empresa / Descripción: "${prompt || companyType || "Empresa tecnológica de rápido crecimiento"}"
-Número aproximado de nodos: ${headcount || 12}
+${sourceInstructions}
 Centro de trabajo: esta estructura es exclusivamente para el centro "${targetSede}".
 
 REGLAS DE SALIDA OBLIGATORIAS:
@@ -824,9 +834,13 @@ REGLAS DE SALIDA OBLIGATORIAS:
 
 ASEGÚRATE de que el primer nodo sea la máxima autoridad de este centro con parentId: null, y que los directores dependan de él, los managers dependan de directores, etc.`;
 
+    const contents = image
+      ? [{ role: "user", parts: [{ text: sysPrompt }, { inlineData: { mimeType: image.mimeType, data: image.data } }] }]
+      : sysPrompt;
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: sysPrompt,
+      contents,
       config: {
         responseMimeType: "application/json"
       }

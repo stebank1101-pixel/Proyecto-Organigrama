@@ -1,9 +1,24 @@
-import { Loader2, PlusCircle, RefreshCw, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { Loader2, PlusCircle, RefreshCw, Sparkles, Upload, X } from "lucide-react";
+import { useRef, useState } from "react";
 import { generateAiOrg } from "../lib/api";
 import { OrgIcon } from "../lib/icons";
 import { computeAllSedes } from "../lib/workCenters";
 import type { OrgNode, WorkCenter } from "../types";
+
+const ACCEPTED_FILE_TYPES = "image/png,image/jpeg,image/webp,application/pdf";
+
+function readFileAsBase64(file: File): Promise<{ mimeType: string; data: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1] || "";
+      resolve({ mimeType: file.type, data: base64 });
+    };
+    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
+    reader.readAsDataURL(file);
+  });
+}
 
 interface AiGeneratorViewProps {
   nodes: OrgNode[];
@@ -20,8 +35,29 @@ export function AiGeneratorView({ nodes, workCenters, onApply, readOnly }: AiGen
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<OrgNode[] | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const allSedes = computeAllSedes(nodes, workCenters);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.files?.[0] || null;
+    setFile(picked);
+    setFilePreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return picked && picked.type.startsWith("image/") ? URL.createObjectURL(picked) : null;
+    });
+  }
+
+  function clearFile() {
+    setFile(null);
+    setFilePreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
@@ -29,7 +65,8 @@ export function AiGeneratorView({ nodes, workCenters, onApply, readOnly }: AiGen
     setLoading(true);
     setError(null);
     try {
-      const res = await generateAiOrg({ prompt, companyType, headcount, targetSede });
+      const image = file ? await readFileAsBase64(file) : null;
+      const res = await generateAiOrg({ prompt, companyType, headcount, targetSede, image });
       setPreview(res.nodes || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al generar el organigrama con IA");
@@ -62,6 +99,43 @@ export function AiGeneratorView({ nodes, workCenters, onApply, readOnly }: AiGen
               onChange={(e) => setPrompt(e.target.value)}
             />
           </label>
+
+          <div className="block text-xs font-medium text-slate-600">
+            O sube una imagen o PDF de un organigrama existente (opcional)
+            <p className="mb-1.5 mt-0.5 text-[11px] font-normal text-slate-400">
+              La IA analizará el archivo y transcribirá esa estructura para este centro de trabajo.
+            </p>
+            {!file ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="btn-secondary w-full justify-center"
+              >
+                <Upload className="h-3.5 w-3.5" /> Elegir imagen o PDF
+              </button>
+            ) : (
+              <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                {filePreviewUrl ? (
+                  <img src={filePreviewUrl} alt="" className="h-12 w-12 flex-shrink-0 rounded-md object-cover" />
+                ) : (
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md bg-slate-200 text-[10px] font-semibold text-slate-500">
+                    PDF
+                  </div>
+                )}
+                <p className="min-w-0 flex-1 truncate text-xs text-slate-700">{file.name}</p>
+                <button type="button" onClick={clearFile} className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_FILE_TYPES}
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-xs font-medium text-slate-600">
