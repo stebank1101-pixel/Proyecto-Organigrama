@@ -2,27 +2,34 @@ import { Loader2, PlusCircle, RefreshCw, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { generateAiOrg } from "../lib/api";
 import { OrgIcon } from "../lib/icons";
-import type { OrgNode } from "../types";
+import { computeAllSedes } from "../lib/workCenters";
+import type { OrgNode, WorkCenter } from "../types";
 
 interface AiGeneratorViewProps {
-  onApply: (nodes: OrgNode[], mode: "replace" | "append") => void;
+  nodes: OrgNode[];
+  workCenters: WorkCenter[];
+  onApply: (nodes: OrgNode[], mode: "replace" | "append", targetSede: string) => void;
   readOnly?: boolean;
 }
 
-export function AiGeneratorView({ onApply, readOnly }: AiGeneratorViewProps) {
+export function AiGeneratorView({ nodes, workCenters, onApply, readOnly }: AiGeneratorViewProps) {
   const [prompt, setPrompt] = useState("");
   const [companyType, setCompanyType] = useState("");
   const [headcount, setHeadcount] = useState(12);
+  const [targetSede, setTargetSede] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<OrgNode[] | null>(null);
 
+  const allSedes = computeAllSedes(nodes, workCenters);
+
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
+    if (!targetSede) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await generateAiOrg({ prompt, companyType, headcount });
+      const res = await generateAiOrg({ prompt, companyType, headcount, targetSede });
       setPreview(res.nodes || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al generar el organigrama con IA");
@@ -74,9 +81,21 @@ export function AiGeneratorView({ onApply, readOnly }: AiGeneratorViewProps) {
             </label>
           </div>
 
+          <label className="block text-xs font-medium text-slate-600">
+            Centro de trabajo destino
+            <select className="input mt-1" value={targetSede} onChange={(e) => setTargetSede(e.target.value)}>
+              <option value="">— Elige un centro —</option>
+              {allSedes.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+
           {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600">{error}</p>}
 
-          <button type="submit" disabled={loading} className="btn-primary w-full justify-center disabled:opacity-50">
+          <button type="submit" disabled={loading || !targetSede} className="btn-primary w-full justify-center disabled:opacity-50">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             {loading ? "Generando estructura..." : "Generar organigrama"}
           </button>
@@ -93,10 +112,10 @@ export function AiGeneratorView({ onApply, readOnly }: AiGeneratorViewProps) {
               </button>
               {!readOnly && (
                 <>
-                  <button className="btn-secondary" onClick={() => onApply(preview, "append")}>
+                  <button className="btn-secondary" onClick={() => onApply(preview, "append", targetSede)}>
                     <PlusCircle className="h-3.5 w-3.5" /> Agregar al actual
                   </button>
-                  <button className="btn-primary" onClick={() => onApply(preview, "replace")}>
+                  <button className="btn-primary" onClick={() => onApply(preview, "replace", targetSede)}>
                     Reemplazar organigrama
                   </button>
                 </>

@@ -1,9 +1,12 @@
 import { KeyRound, Loader2, Plug, PlusCircle, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createApiKey, fetchApiKeys, fetchSyncLogs, triggerHrSync } from "../lib/api";
-import type { ApiKeyRecord, SyncLogRecord } from "../types";
+import { computeAllSedes } from "../lib/workCenters";
+import type { ApiKeyRecord, OrgNode, SyncLogRecord, WorkCenter } from "../types";
 
 interface HrIntegrationViewProps {
+  nodes: OrgNode[];
+  workCenters: WorkCenter[];
   onSynced: () => void;
   readOnly?: boolean;
 }
@@ -13,7 +16,7 @@ const SAMPLE_EMPLOYEES = [
   { id: "EMP-102", fullName: "Diego Salazar", jobTitle: "Ejecutivo de Cuenta", department: "Comercial", location: "Bogotá - Sede Regional" },
 ];
 
-export function HrIntegrationView({ onSynced, readOnly }: HrIntegrationViewProps) {
+export function HrIntegrationView({ nodes, workCenters, onSynced, readOnly }: HrIntegrationViewProps) {
   const [keys, setKeys] = useState<ApiKeyRecord[]>([]);
   const [logs, setLogs] = useState<SyncLogRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +25,9 @@ export function HrIntegrationView({ onSynced, readOnly }: HrIntegrationViewProps
   const [creating, setCreating] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [targetSede, setTargetSede] = useState("");
+
+  const allSedes = computeAllSedes(nodes, workCenters);
 
   async function refresh() {
     setLoading(true);
@@ -53,10 +59,11 @@ export function HrIntegrationView({ onSynced, readOnly }: HrIntegrationViewProps
   }
 
   async function handleTestSync(mode: "append" | "replace") {
+    if (!targetSede) return;
     setSyncing(true);
     setMessage(null);
     try {
-      const res = await triggerHrSync({ provider: "Personio HR API (demo)", mode, employees: SAMPLE_EMPLOYEES });
+      const res = await triggerHrSync({ provider: "Personio HR API (demo)", mode, employees: SAMPLE_EMPLOYEES, targetSede });
       setMessage(res.message);
       await refresh();
       onSynced();
@@ -85,15 +92,28 @@ export function HrIntegrationView({ onSynced, readOnly }: HrIntegrationViewProps
           desde Workday, Personio, BambooHR o Factorial.
         </p>
         {!readOnly && (
-          <div className="flex flex-wrap gap-2">
-            <button className="btn-secondary" disabled={syncing} onClick={() => handleTestSync("append")}>
-              {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlusCircle className="h-3.5 w-3.5" />}
-              Agregar empleados de prueba
-            </button>
-            <button className="btn-primary" disabled={syncing} onClick={() => handleTestSync("replace")}>
-              Reemplazar con datos de prueba
-            </button>
-          </div>
+          <>
+            <label className="mb-3 block text-xs font-medium text-slate-600">
+              Centro de trabajo destino
+              <select className="input mt-1" value={targetSede} onChange={(e) => setTargetSede(e.target.value)}>
+                <option value="">— Elige un centro —</option>
+                {allSedes.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn-secondary" disabled={syncing || !targetSede} onClick={() => handleTestSync("append")}>
+                {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlusCircle className="h-3.5 w-3.5" />}
+                Agregar empleados de prueba
+              </button>
+              <button className="btn-primary" disabled={syncing || !targetSede} onClick={() => handleTestSync("replace")}>
+                Reemplazar con datos de prueba
+              </button>
+            </div>
+          </>
         )}
         {message && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{message}</p>}
       </div>

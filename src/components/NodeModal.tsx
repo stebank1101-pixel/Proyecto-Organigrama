@@ -67,7 +67,9 @@ export function NodeModal({ open, initial, defaultParentId, defaultSede, nodes, 
   if (!open) return null;
 
   const blockedParentIds = initial ? getDescendantIds(initial.id, nodes) : new Set<string>();
-  const parentOptions = nodes.filter((n) => n.id !== initial?.id && !blockedParentIds.has(n.id));
+  const parentOptions = form.sede
+    ? nodes.filter((n) => n.id !== initial?.id && n.sede === form.sede && !blockedParentIds.has(n.id))
+    : [];
 
   function update<K extends keyof OrgNode>(key: K, value: OrgNode[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -133,17 +135,26 @@ export function NodeModal({ open, initial, defaultParentId, defaultSede, nodes, 
               <input className="input" value={form.department} onChange={(e) => update("department", e.target.value)} />
             </Field>
             <Field label="Sede">
-              <input
+              <select
                 className="input"
-                list="sede-options"
                 value={form.sede}
-                onChange={(e) => update("sede", e.target.value)}
-              />
-              <datalist id="sede-options">
+                onChange={(e) => {
+                  const newSede = e.target.value;
+                  setForm((prev) => ({
+                    ...prev,
+                    sede: newSede,
+                    // A parent from the previous center is no longer valid once the sede changes.
+                    parentId: nodes.some((n) => n.id === prev.parentId && n.sede === newSede) ? prev.parentId : null,
+                  }));
+                }}
+              >
+                <option value="">— Sin centro —</option>
                 {(sedeOptions ?? []).map((s) => (
-                  <option key={s} value={s} />
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
-              </datalist>
+              </select>
             </Field>
           </div>
 
@@ -315,6 +326,7 @@ export function NodeModal({ open, initial, defaultParentId, defaultSede, nodes, 
               className="input"
               value={form.parentId ?? ""}
               onChange={(e) => update("parentId", e.target.value || null)}
+              disabled={!form.sede}
             >
               <option value="">— Sin superior (raíz) —</option>
               {parentOptions.map((n) => (
@@ -323,6 +335,7 @@ export function NodeModal({ open, initial, defaultParentId, defaultSede, nodes, 
                 </option>
               ))}
             </select>
+            {!form.sede && <p className="mt-1 text-[11px] text-slate-400">Elige una sede para poder asignar un superior.</p>}
           </Field>
 
           <div className="grid grid-cols-3 gap-3">

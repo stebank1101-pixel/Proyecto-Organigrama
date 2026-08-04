@@ -92,3 +92,4 @@ insert into public.api_keys (id, name, key, provider, status, created) values
   ('key-1', 'Workday Integration Key', 'org_live_wk982347x910283', 'Workday HR', 'active', '2026-01-15'),
   ('key-2', 'Factorial RRHH Webhook', 'org_live_fc102938475610', 'Factorial', 'active', '2026-03-10')
 on conflict (id) do nothing;
+

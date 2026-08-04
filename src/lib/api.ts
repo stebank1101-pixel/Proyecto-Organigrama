@@ -129,6 +129,7 @@ export function triggerHrSync(payload: {
   provider: string;
   mode: "append" | "replace";
   employees: Array<Record<string, unknown>>;
+  targetSede: string;
 }): Promise<{ success: boolean; message: string; totalProcessed: number; currentTotalNodes: number }> {
   return request("/api/v1/hr/sync", {
     method: "POST",
@@ -140,6 +141,7 @@ export function generateAiOrg(payload: {
   prompt: string;
   companyType?: string;
   headcount?: number;
+  targetSede: string;
 }): Promise<{ success: boolean; nodes: OrgNode[] }> {
   return request("/api/ai/generate-org", {
     method: "POST",

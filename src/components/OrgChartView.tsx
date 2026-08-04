@@ -1,20 +1,16 @@
 import { toPng, toSvg } from "html-to-image";
 import { jsPDF } from "jspdf";
-import { Building2, Download, FileImage, FileText, ListTree, Network, Plus, Save, Search, Settings } from "lucide-react";
+import { ArrowLeft, Building2, Download, FileImage, FileText, ListTree, Network, Plus, Save, Search, Settings } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import {
-  createWorkCenterApi,
-  deleteWorkCenterApi,
-  fetchWorkCenters,
-  renameWorkCenterApi,
-  updateWorkCenterProfileApi,
-} from "../lib/api";
+import { computeAllSedes, computeWorkCenterRows, type CenterSelection } from "../lib/workCenters";
 import type { OrgNode, ViewMode, WorkCenter } from "../types";
+import { AllCentersOverview } from "./AllCentersOverview";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { FreeView } from "./FreeView";
 import { NodeModal } from "./NodeModal";
 import { TreeView } from "./TreeView";
 import { WorkCenterManagerModal } from "./WorkCenterManagerModal";
+import { WorkCenterPicker } from "./WorkCenterPicker";
 
 // Extra empty margin around the chart so there's always room to drag-pan in every
 // direction, even when the chart itself is smaller than the viewport.
@@ -22,21 +18,25 @@ const PAN_PADDING = 400;
 
 interface OrgChartViewProps {
   nodes: OrgNode[];
+  workCenters: WorkCenter[];
+  centerError: string | null;
   onAddNode: (node: OrgNode) => void;
   onUpdateNode: (node: OrgNode) => void;
   onDeleteNode: (id: string) => void;
   onMoveNode: (id: string, x: number, y: number) => void;
-  onBulkUpdateNodes: (nodes: OrgNode[]) => Promise<void>;
   onSave: () => void;
+  onCreateWorkCenter: (name: string) => Promise<boolean>;
+  onRenameWorkCenter: (oldName: string, newName: string) => Promise<boolean>;
+  onDeleteWorkCenter: (name: string) => Promise<boolean>;
+  onUpdateWorkCenterProfile: (name: string, profile: Partial<Omit<WorkCenter, "name">>) => Promise<boolean>;
   saving: boolean;
   dirty: boolean;
   readOnly?: boolean;
 }
 
-function computeVisibleNodes(nodes: OrgNode[], sede: string, department: string, search: string): OrgNode[] {
+function computeVisibleNodes(nodes: OrgNode[], department: string, search: string): OrgNode[] {
   const term = search.trim().toLowerCase();
   const matches = (n: OrgNode) =>
-    (sede === "all" || n.sede === sede) &&
     (department === "all" || n.department === department) &&
     (!term ||
       n.name.toLowerCase().includes(term) ||
@@ -44,7 +44,7 @@ function computeVisibleNodes(nodes: OrgNode[], sede: string, department: string,
       n.department.toLowerCase().includes(term) ||
       (n.assignees ?? []).some((a) => a.name.toLowerCase().includes(term)));
 
-  if (sede === "all" && department === "all" && !term) return nodes;
+  if (department === "all" && !term) return nodes;
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const visibleIds = new Set<string>();
@@ -63,18 +63,23 @@ function computeVisibleNodes(nodes: OrgNode[], sede: string, department: string,
 
 export function OrgChartView({
   nodes,
+  workCenters,
+  centerError,
   onAddNode,
   onUpdateNode,
   onDeleteNode,
   onMoveNode,
-  onBulkUpdateNodes,
   onSave,
+  onCreateWorkCenter,
+  onRenameWorkCenter,
+  onDeleteWorkCenter,
+  onUpdateWorkCenterProfile,
   saving,
   dirty,
   readOnly,
 }: OrgChartViewProps) {
+  const [selectedCenter, setSelectedCenter] = useState<CenterSelection>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("tree");
-  const [sedeFilter, setSedeFilter] = useState("all");
   const [deptFilter, setDeptFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [modalState, setModalState] = useState<{
@@ -89,20 +94,20 @@ export function OrgChartView({
   });
   const [deleteTarget, setDeleteTarget] = useState<OrgNode | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [extraSedes, setExtraSedes] = useState<WorkCenter[]>([]);
   const [manageCentersOpen, setManageCentersOpen] = useState(false);
-  const [centerError, setCenterError] = useState<string | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const panState = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
+
+  const activeCenter = selectedCenter && selectedCenter !== "ALL" ? selectedCenter : null;
 
   useLayoutEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
     container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
     container.scrollTop = Math.max(0, PAN_PADDING - 24);
-  }, [viewMode, sedeFilter, deptFilter, search]);
+  }, [viewMode, selectedCenter, deptFilter, search]);
 
   useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
@@ -128,12 +133,6 @@ export function OrgChartView({
     };
   }, []);
 
-  useEffect(() => {
-    fetchWorkCenters()
-      .then((res) => setExtraSedes(res.data))
-      .catch((err) => setCenterError(err instanceof Error ? err.message : "No se pudieron cargar los centros de trabajo"));
-  }, []);
-
   function handleCanvasMouseDown(e: React.MouseEvent) {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
@@ -146,104 +145,25 @@ export function OrgChartView({
     setIsPanning(true);
   }
 
-  const sedes = useMemo(() => Array.from(new Set(nodes.map((n) => n.sede).filter(Boolean))).sort(), [nodes]);
-  const departments = useMemo(() => Array.from(new Set(nodes.map((n) => n.department).filter(Boolean))).sort(), [nodes]);
-  const sedeCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const n of nodes) {
-      if (!n.sede) continue;
-      counts.set(n.sede, (counts.get(n.sede) || 0) + 1);
-    }
-    return counts;
-  }, [nodes]);
-  const allSedes = useMemo(
-    () => Array.from(new Set([...sedes, ...extraSedes.map((c) => c.name)])).sort(),
-    [sedes, extraSedes]
+  const allSedes = useMemo(() => computeAllSedes(nodes, workCenters), [nodes, workCenters]);
+  const workCenterRows = useMemo(() => computeWorkCenterRows(nodes, workCenters), [nodes, workCenters]);
+
+  const centerNodes = useMemo(
+    () => (activeCenter ? nodes.filter((n) => n.sede === activeCenter) : []),
+    [nodes, activeCenter]
   );
-
-  const workCenterRows = useMemo(
-    () =>
-      allSedes.map((name) => {
-        const profile = extraSedes.find((c) => c.name === name);
-        return {
-          name,
-          count: sedeCounts.get(name) ?? 0,
-          address: profile?.address ?? "",
-          email: profile?.email ?? "",
-          phone: profile?.phone ?? "",
-          headcount: profile?.headcount ?? 0,
-          budget: profile?.budget ?? "",
-        };
-      }),
-    [allSedes, sedeCounts, extraSedes]
+  const departments = useMemo(
+    () => Array.from(new Set(centerNodes.map((n) => n.department).filter(Boolean))).sort(),
+    [centerNodes]
   );
-
-  async function createWorkCenter(name: string) {
-    if (allSedes.some((s) => s.toLowerCase() === name.toLowerCase())) return;
-    setCenterError(null);
-    try {
-      await createWorkCenterApi(name);
-      setExtraSedes((prev) => [...prev, { name, address: "", email: "", phone: "", headcount: 0, budget: "" }]);
-    } catch (err) {
-      setCenterError(err instanceof Error ? err.message : "No se pudo crear el centro de trabajo");
-    }
-  }
-
-  async function renameWorkCenter(oldName: string, newName: string) {
-    if (allSedes.some((s) => s.toLowerCase() === newName.toLowerCase() && s !== oldName)) return;
-    setCenterError(null);
-    try {
-      await renameWorkCenterApi(oldName, newName);
-      if (nodes.some((n) => n.sede === oldName)) {
-        await onBulkUpdateNodes(nodes.map((n) => (n.sede === oldName ? { ...n, sede: newName } : n)));
-      }
-      setExtraSedes((prev) => {
-        const existing = prev.find((c) => c.name === oldName);
-        if (existing) return prev.map((c) => (c.name === oldName ? { ...c, name: newName } : c));
-        return [...prev, { name: newName, address: "", email: "", phone: "", headcount: 0, budget: "" }];
-      });
-      if (sedeFilter === oldName) setSedeFilter(newName);
-    } catch (err) {
-      setCenterError(err instanceof Error ? err.message : "No se pudo renombrar el centro de trabajo");
-    }
-  }
-
-  async function deleteWorkCenter(name: string) {
-    setCenterError(null);
-    try {
-      await deleteWorkCenterApi(name);
-      if (nodes.some((n) => n.sede === name)) {
-        await onBulkUpdateNodes(nodes.map((n) => (n.sede === name ? { ...n, sede: "" } : n)));
-      }
-      setExtraSedes((prev) => prev.filter((c) => c.name !== name));
-      if (sedeFilter === name) setSedeFilter("all");
-    } catch (err) {
-      setCenterError(err instanceof Error ? err.message : "No se pudo eliminar el centro de trabajo");
-    }
-  }
-
-  async function updateWorkCenterProfile(name: string, profile: Partial<Omit<WorkCenter, "name">>) {
-    setCenterError(null);
-    try {
-      await updateWorkCenterProfileApi(name, profile);
-      setExtraSedes((prev) => {
-        const existing = prev.find((c) => c.name === name);
-        if (existing) return prev.map((c) => (c.name === name ? { ...c, ...profile } : c));
-        return [...prev, { name, address: "", email: "", phone: "", headcount: 0, budget: "", ...profile }];
-      });
-    } catch (err) {
-      setCenterError(err instanceof Error ? err.message : "No se pudo actualizar el centro de trabajo");
-    }
-  }
-
   const visibleNodes = useMemo(
-    () => computeVisibleNodes(nodes, sedeFilter, deptFilter, search),
-    [nodes, sedeFilter, deptFilter, search]
+    () => computeVisibleNodes(centerNodes, deptFilter, search),
+    [centerNodes, deptFilter, search]
   );
 
   function openCreate(parentId: string | null) {
     if (readOnly) return;
-    setModalState({ open: true, initial: null, parentId });
+    setModalState({ open: true, initial: null, parentId, defaultSede: activeCenter ?? undefined });
   }
 
   function openCreateForCenter(sedeName: string) {
@@ -268,6 +188,16 @@ export function OrgChartView({
   function confirmDelete() {
     if (deleteTarget) onDeleteNode(deleteTarget.id);
     setDeleteTarget(null);
+  }
+
+  async function handleRenameCenter(oldName: string, newName: string) {
+    const ok = await onRenameWorkCenter(oldName, newName);
+    if (ok && selectedCenter === oldName) setSelectedCenter(newName);
+  }
+
+  async function handleDeleteCenter(name: string) {
+    const ok = await onDeleteWorkCenter(name);
+    if (ok && selectedCenter === name) setSelectedCenter(null);
   }
 
   async function exportAs(format: "png" | "svg" | "pdf") {
@@ -306,149 +236,167 @@ export function OrgChartView({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
-        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
-          <button
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
-              viewMode === "tree" ? "bg-white text-sky-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
-            }`}
-            onClick={() => setViewMode("tree")}
-          >
-            <ListTree className="h-3.5 w-3.5" /> Jerárquico
-          </button>
-          <button
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
-              viewMode === "free" ? "bg-white text-sky-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
-            }`}
-            onClick={() => setViewMode("free")}
-          >
-            <Network className="h-3.5 w-3.5" /> Vista libre
-          </button>
-        </div>
-
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre o cargo..."
-            className="w-56 rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2 text-xs text-slate-700 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
-          />
-        </div>
-
-        <select className="select-sm" value={sedeFilter} onChange={(e) => setSedeFilter(e.target.value)}>
-          <option value="all">Todas las sedes</option>
-          {sedes.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-
-        <select className="select-sm" value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
-          <option value="all">Todos los departamentos</option>
-          {departments.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
-        </select>
-
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {!readOnly && (
-            <button onClick={() => openCreate(null)} className="btn-secondary">
-              <Plus className="h-3.5 w-3.5" /> Nuevo nodo
-            </button>
-          )}
-          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
-            <button disabled={exporting} onClick={() => exportAs("png")} className="icon-btn" title="Exportar PNG">
-              <FileImage className="h-3.5 w-3.5" />
-            </button>
-            <button disabled={exporting} onClick={() => exportAs("svg")} className="icon-btn" title="Exportar SVG">
-              <Download className="h-3.5 w-3.5" />
-            </button>
-            <button disabled={exporting} onClick={() => exportAs("pdf")} className="icon-btn" title="Exportar PDF">
-              <FileText className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          {!readOnly && (
-            <button onClick={onSave} disabled={saving || !dirty} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">
-              <Save className="h-3.5 w-3.5" /> {saving ? "Guardando..." : dirty ? "Guardar cambios" : "Sincronizado"}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {(allSedes.length > 0 || !readOnly) && (
-        <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-200 bg-slate-50 px-4 py-2">
-          <span className="flex flex-shrink-0 items-center gap-1 text-[11px] font-medium text-slate-500">
-            <Building2 className="h-3.5 w-3.5" /> Centros de trabajo:
-          </span>
-          <button
-            onClick={() => setSedeFilter("all")}
-            className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
-              sedeFilter === "all"
-                ? "border-slate-900 bg-slate-900 text-white"
-                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-            }`}
-          >
-            Todos
-          </button>
-          {allSedes.map((s) => (
+      {selectedCenter === null ? (
+        <WorkCenterPicker
+          rows={workCenterRows}
+          readOnly={readOnly}
+          error={centerError}
+          onSelect={(name) => setSelectedCenter(name)}
+          onSelectAll={() => setSelectedCenter("ALL")}
+          onManage={() => setManageCentersOpen(true)}
+        />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
             <button
-              key={s}
-              onClick={() => setSedeFilter(s)}
+              onClick={() => setSelectedCenter(null)}
+              className="icon-btn border border-slate-200"
+              title="Volver a centros de trabajo"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </button>
+
+            {activeCenter && (
+              <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                <button
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
+                    viewMode === "tree" ? "bg-white text-sky-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                  onClick={() => setViewMode("tree")}
+                >
+                  <ListTree className="h-3.5 w-3.5" /> Jerárquico
+                </button>
+                <button
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
+                    viewMode === "free" ? "bg-white text-sky-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                  onClick={() => setViewMode("free")}
+                >
+                  <Network className="h-3.5 w-3.5" /> Vista libre
+                </button>
+              </div>
+            )}
+
+            {activeCenter && (
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar por nombre o cargo..."
+                  className="w-56 rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2 text-xs text-slate-700 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+                />
+              </div>
+            )}
+
+            {activeCenter && (
+              <select className="select-sm" value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
+                <option value="all">Todos los departamentos</option>
+                {departments.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {activeCenter && !readOnly && (
+                <button onClick={() => openCreate(null)} className="btn-secondary">
+                  <Plus className="h-3.5 w-3.5" /> Nuevo nodo
+                </button>
+              )}
+              <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                <button disabled={exporting} onClick={() => exportAs("png")} className="icon-btn" title="Exportar PNG">
+                  <FileImage className="h-3.5 w-3.5" />
+                </button>
+                <button disabled={exporting} onClick={() => exportAs("svg")} className="icon-btn" title="Exportar SVG">
+                  <Download className="h-3.5 w-3.5" />
+                </button>
+                <button disabled={exporting} onClick={() => exportAs("pdf")} className="icon-btn" title="Exportar PDF">
+                  <FileText className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {activeCenter && !readOnly && (
+                <button onClick={onSave} disabled={saving || !dirty} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">
+                  <Save className="h-3.5 w-3.5" /> {saving ? "Guardando..." : dirty ? "Guardar cambios" : "Sincronizado"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-200 bg-slate-50 px-4 py-2">
+            <span className="flex flex-shrink-0 items-center gap-1 text-[11px] font-medium text-slate-500">
+              <Building2 className="h-3.5 w-3.5" /> Centros de trabajo:
+            </span>
+            <button
+              onClick={() => setSelectedCenter("ALL")}
               className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
-                sedeFilter === s
-                  ? "border-sky-600 bg-sky-600 text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-sky-300"
+                selectedCenter === "ALL"
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
               }`}
             >
-              {s}
+              Todos
             </button>
-          ))}
-          {!readOnly && (
-            <button
-              onClick={() => setManageCentersOpen(true)}
-              className="ml-auto flex flex-shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:border-sky-300"
-              title="Crear o modificar centros de trabajo"
-            >
-              <Settings className="h-3 w-3" /> Gestionar
-            </button>
-          )}
-        </div>
-      )}
+            {allSedes.map((s) => (
+              <button
+                key={s}
+                onClick={() => setSelectedCenter(s)}
+                className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                  selectedCenter === s
+                    ? "border-sky-600 bg-sky-600 text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-sky-300"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+            {!readOnly && (
+              <button
+                onClick={() => setManageCentersOpen(true)}
+                className="ml-auto flex flex-shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:border-sky-300"
+                title="Crear o modificar centros de trabajo"
+              >
+                <Settings className="h-3 w-3" /> Gestionar
+              </button>
+            )}
+          </div>
 
-      <div
-        ref={scrollRef}
-        onMouseDown={handleCanvasMouseDown}
-        className={`min-h-0 flex-1 overflow-auto bg-white bg-[radial-gradient(circle_at_1px_1px,rgba(100,116,139,0.18)_1px,transparent_0)] bg-[length:22px_22px] ${
-          isPanning ? "cursor-grabbing select-none" : "cursor-grab"
-        }`}
-      >
-        <div style={{ padding: PAN_PADDING }} className="inline-block min-w-full">
-          {viewMode === "tree" ? (
-            <TreeView
-              ref={contentRef}
-              nodes={visibleNodes}
-              onEdit={openEdit}
-              onDelete={setDeleteTarget}
-              onAddChild={(p) => openCreate(p.id)}
-              readOnly={readOnly}
-            />
-          ) : (
-            <FreeView
-              ref={contentRef}
-              nodes={visibleNodes}
-              onEdit={openEdit}
-              onDelete={setDeleteTarget}
-              onAddChild={(p) => openCreate(p.id)}
-              onNodeMove={onMoveNode}
-              readOnly={readOnly}
-            />
-          )}
-        </div>
-      </div>
+          <div
+            ref={scrollRef}
+            onMouseDown={handleCanvasMouseDown}
+            className={`min-h-0 flex-1 overflow-auto bg-white bg-[radial-gradient(circle_at_1px_1px,rgba(100,116,139,0.18)_1px,transparent_0)] bg-[length:22px_22px] ${
+              isPanning ? "cursor-grabbing select-none" : "cursor-grab"
+            }`}
+          >
+            <div style={{ padding: PAN_PADDING }} className="inline-block min-w-full">
+              {selectedCenter === "ALL" ? (
+                <AllCentersOverview ref={contentRef} nodes={nodes} allSedes={allSedes} />
+              ) : viewMode === "tree" ? (
+                <TreeView
+                  ref={contentRef}
+                  nodes={visibleNodes}
+                  onEdit={openEdit}
+                  onDelete={setDeleteTarget}
+                  onAddChild={(p) => openCreate(p.id)}
+                  readOnly={readOnly}
+                />
+              ) : (
+                <FreeView
+                  ref={contentRef}
+                  nodes={visibleNodes}
+                  onEdit={openEdit}
+                  onDelete={setDeleteTarget}
+                  onAddChild={(p) => openCreate(p.id)}
+                  onNodeMove={onMoveNode}
+                  readOnly={readOnly}
+                />
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Renders before NodeModal/ConfirmDialog so those stack on top of it when opened from within. */}
       <WorkCenterManagerModal
@@ -457,14 +405,11 @@ export function OrgChartView({
         nodes={nodes}
         error={centerError}
         readOnly={readOnly}
-        onClose={() => {
-          setManageCentersOpen(false);
-          setCenterError(null);
-        }}
-        onCreate={createWorkCenter}
-        onRename={renameWorkCenter}
-        onDelete={deleteWorkCenter}
-        onUpdateProfile={updateWorkCenterProfile}
+        onClose={() => setManageCentersOpen(false)}
+        onCreate={onCreateWorkCenter}
+        onRename={handleRenameCenter}
+        onDelete={handleDeleteCenter}
+        onUpdateProfile={onUpdateWorkCenterProfile}
         onEditNode={openEdit}
         onCreateNode={openCreateForCenter}
         onDeleteNode={setDeleteTarget}

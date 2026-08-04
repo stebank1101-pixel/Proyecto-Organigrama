@@ -1,16 +1,7 @@
 import { AlertTriangle, ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
+import type { WorkCenterRow } from "../lib/workCenters";
 import type { OrgNode } from "../types";
-
-export interface WorkCenterRow {
-  name: string;
-  count: number;
-  address: string;
-  email: string;
-  phone: string;
-  headcount: number;
-  budget: string;
-}
 
 interface ProfileDraft {
   address: string;

@@ -656,23 +656,30 @@ app.delete("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
 app.post("/api/v1/hr/sync", requireAdmin, async (req, res) => {
   const provider = req.body.provider || "Sistema de RRHH Externo";
   const incomingEmployees = req.body.employees || [];
+  const targetSede = (req.body.targetSede || "").trim();
+
+  if (!targetSede) {
+    return res.status(400).json({ error: "Debes indicar el centro de trabajo (targetSede) que recibirá la sincronización" });
+  }
 
   if (incomingEmployees.length > 0) {
     try {
       const currentNodes = await loadNodes();
 
-      // Merge or map incoming employees
+      // Merge or map incoming employees. Every synced node is stamped with the chosen
+      // work center — each center's org chart is independent, so an import can never
+      // silently place someone (or anchor a parent) into a different center's tree.
       const mapped = incomingEmployees.map((emp: any, index: number) => ({
         id: emp.id || `hr-emp-${Date.now()}-${index}`,
         name: emp.fullName || emp.name || "Empleado Nuevo",
         title: emp.jobTitle || emp.title || "Colaborador",
         department: emp.department || "General",
-        sede: emp.location || emp.sede || "Sede Central",
+        sede: targetSede,
         email: emp.email || "contacto@empresa.com",
         phone: emp.phone || "+34 900 000 000",
         avatar: emp.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
         roleType: emp.roleType || "employee",
-        parentId: emp.reportsToId || emp.parentId || currentNodes[0]?.id || null,
+        parentId: emp.reportsToId || emp.parentId || null,
         freeX: 300 + (index % 4) * 220,
         freeY: 300 + Math.floor(index / 4) * 160,
         metrics: { headcount: emp.teamSize || 0, budget: emp.budget || "N/A" },
@@ -682,10 +689,11 @@ app.post("/api/v1/hr/sync", requireAdmin, async (req, res) => {
         assignees: []
       }));
 
-      // Optionally combine or replace
+      // Optionally combine or replace — scoped to the target center only, so other
+      // centers' nodes are never touched by this sync.
       let nextNodes: any[];
       if (req.body.mode === "replace") {
-        nextNodes = mapped;
+        nextNodes = [...currentNodes.filter((n: any) => n.sede !== targetSede), ...mapped];
       } else {
         // merge without duplicating IDs
         const existingIds = new Set(currentNodes.map((n) => n.id));
@@ -775,7 +783,12 @@ app.get("/api/v1/integrations/logs", async (req, res) => {
 app.post("/api/ai/generate-org", async (req, res) => {
   try {
     const { prompt, companyType, headcount } = req.body;
+    const targetSede = (req.body.targetSede || "").trim();
     const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!targetSede) {
+      return res.status(400).json({ error: "Debes indicar el centro de trabajo (targetSede) para el que se generará el organigrama" });
+    }
 
     if (!apiKey) {
       return res.status(400).json({
@@ -789,6 +802,7 @@ app.post("/api/ai/generate-org", async (req, res) => {
 Genera una estructura de organigrama completa en formato JSON para el siguiente pedido:
 Empresa / Descripción: "${prompt || companyType || "Empresa tecnológica de rápido crecimiento"}"
 Número aproximado de nodos: ${headcount || 12}
+Centro de trabajo: esta estructura es exclusivamente para el centro "${targetSede}".
 
 REGLAS DE SALIDA OBLIGATORIAS:
 1. Responde ÚNICAMENTE con un objeto JSON estructurado con la clave "nodes" que contiene un array de objetos con las siguientes propiedades:
@@ -796,16 +810,16 @@ REGLAS DE SALIDA OBLIGATORIAS:
 - name: nombre completo en español (realista y ejecutivo)
 - title: cargo profesional exacto
 - department: departamento (ej: Dirección General, Tecnología, Recursos Humanos, Finanzas, Comercial, Operaciones, Producto)
-- sede: una de las sedes sugeridas (ej: "Madrid - Sede Central", "CDMX - Tech Hub", "Bogotá - Sede Regional", "Remote / Global")
+- sede: usa siempre exactamente "${targetSede}" en este campo, para todos los nodos
 - email: correo corporativo válido ficticio
 - phone: teléfono formato internacional
 - avatar: URL de foto de perfil limpia de unsplash (o usa variaciones de personas profesionales de unsplash)
 - roleType: uno de "executive", "director", "manager", "employee"
-- parentId: id del nodo superior jerárquico (el CEO/Director General debe tener parentId: null). Cada otro nodo DEBE tener un parentId válido existente en el array!
+- parentId: id del nodo superior jerárquico dentro de este mismo centro (el director del centro debe tener parentId: null). Cada otro nodo DEBE tener un parentId válido existente en el array!
 - customBadge: distintivo corporativo corto (ej: "Comité Ejecutivo", "Tech Core", "Squad Lead")
 - iconName: nombre de icono lucide (Crown, Cpu, Users, Briefcase, Server, Palette, Globe, Target, Shield, Award)
 
-ASEGÚRATE de que el primer nodo sea el CEO/Director General con parentId: null, y que los directores dependan del CEO, los managers dependan de directores, etc.`;
+ASEGÚRATE de que el primer nodo sea la máxima autoridad de este centro con parentId: null, y que los directores dependan de él, los managers dependan de directores, etc.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -819,10 +833,12 @@ ASEGÚRATE de que el primer nodo sea el CEO/Director General con parentId: null,
     const parsed = JSON.parse(text);
 
     if (parsed && Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
-      // Calculate coordinates for free view auto placement
+      // Calculate coordinates for free view auto placement. `sede` is force-stamped
+      // server-side rather than trusted from the model's output.
       const nodesWithCoords = parsed.nodes.map((node: any, idx: number) => {
         return {
           ...node,
+          sede: targetSede,
           avatar: node.avatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
           assignees: node.assignees || [],
           freeX: 350 + (idx % 3) * 260,

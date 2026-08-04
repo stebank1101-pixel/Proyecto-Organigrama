@@ -6,9 +6,17 @@ import { LoginView } from "./components/LoginView";
 import { NavBar } from "./components/NavBar";
 import { OrgChartView } from "./components/OrgChartView";
 import { ProfilesView } from "./components/ProfilesView";
-import { bulkSyncNodes, fetchNodes } from "./lib/api";
+import {
+  bulkSyncNodes,
+  createWorkCenterApi,
+  deleteWorkCenterApi,
+  fetchNodes,
+  fetchWorkCenters,
+  renameWorkCenterApi,
+  updateWorkCenterProfileApi,
+} from "./lib/api";
 import { useAuth } from "./lib/auth";
-import type { OrgNode, TabId } from "./types";
+import type { OrgNode, TabId, WorkCenter } from "./types";
 
 interface Toast {
   id: number;
@@ -19,6 +27,8 @@ interface Toast {
 export default function App() {
   const { user, loading: authLoading, isAdmin, isGuest } = useAuth();
   const [nodes, setNodes] = useState<OrgNode[]>([]);
+  const [workCenters, setWorkCenters] = useState<WorkCenter[]>([]);
+  const [centerError, setCenterError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -50,6 +60,13 @@ export default function App() {
   useEffect(() => {
     if (user || isGuest) loadNodes();
   }, [user, isGuest, loadNodes]);
+
+  useEffect(() => {
+    if (!user && !isGuest) return;
+    fetchWorkCenters()
+      .then((res) => setWorkCenters(res.data))
+      .catch((err) => setCenterError(err instanceof Error ? err.message : "No se pudieron cargar los centros de trabajo"));
+  }, [user, isGuest]);
 
   useEffect(() => {
     if (!isAdmin && activeTab === "profiles") setActiveTab("chart");
@@ -87,9 +104,9 @@ export default function App() {
     setDirty(false);
   }
 
-  function handleApplyAiNodes(newNodes: OrgNode[], mode: "replace" | "append") {
+  function handleApplyAiNodes(newNodes: OrgNode[], mode: "replace" | "append", targetSede: string) {
     if (mode === "replace") {
-      setNodes(newNodes);
+      setNodes((prev) => [...prev.filter((n) => n.sede !== targetSede), ...newNodes]);
     } else {
       setNodes((prev) => {
         const existingIds = new Set(prev.map((n) => n.id));
@@ -99,7 +116,7 @@ export default function App() {
     }
     setDirty(true);
     setActiveTab("chart");
-    pushToast(`Se aplicaron ${newNodes.length} nodos generados por IA`);
+    pushToast(`Se aplicaron ${newNodes.length} nodos generados por IA en ${targetSede}`);
   }
 
   async function handleSave() {
@@ -118,6 +135,70 @@ export default function App() {
   async function handleHrSynced() {
     await loadNodes(true);
     pushToast("Organigrama actualizado desde RRHH");
+  }
+
+  async function handleCreateWorkCenter(name: string): Promise<boolean> {
+    setCenterError(null);
+    try {
+      await createWorkCenterApi(name);
+      setWorkCenters((prev) =>
+        prev.some((c) => c.name === name) ? prev : [...prev, { name, address: "", email: "", phone: "", headcount: 0, budget: "" }]
+      );
+      return true;
+    } catch (err) {
+      setCenterError(err instanceof Error ? err.message : "No se pudo crear el centro de trabajo");
+      return false;
+    }
+  }
+
+  async function handleRenameWorkCenter(oldName: string, newName: string): Promise<boolean> {
+    setCenterError(null);
+    try {
+      await renameWorkCenterApi(oldName, newName);
+      if (nodes.some((n) => n.sede === oldName)) {
+        await handleBulkUpdateNodes(nodes.map((n) => (n.sede === oldName ? { ...n, sede: newName } : n)));
+      }
+      setWorkCenters((prev) => {
+        const existing = prev.find((c) => c.name === oldName);
+        if (existing) return prev.map((c) => (c.name === oldName ? { ...c, name: newName } : c));
+        return [...prev, { name: newName, address: "", email: "", phone: "", headcount: 0, budget: "" }];
+      });
+      return true;
+    } catch (err) {
+      setCenterError(err instanceof Error ? err.message : "No se pudo renombrar el centro de trabajo");
+      return false;
+    }
+  }
+
+  async function handleDeleteWorkCenter(name: string): Promise<boolean> {
+    setCenterError(null);
+    try {
+      await deleteWorkCenterApi(name);
+      if (nodes.some((n) => n.sede === name)) {
+        await handleBulkUpdateNodes(nodes.map((n) => (n.sede === name ? { ...n, sede: "" } : n)));
+      }
+      setWorkCenters((prev) => prev.filter((c) => c.name !== name));
+      return true;
+    } catch (err) {
+      setCenterError(err instanceof Error ? err.message : "No se pudo eliminar el centro de trabajo");
+      return false;
+    }
+  }
+
+  async function handleUpdateWorkCenterProfile(name: string, profile: Partial<Omit<WorkCenter, "name">>): Promise<boolean> {
+    setCenterError(null);
+    try {
+      await updateWorkCenterProfileApi(name, profile);
+      setWorkCenters((prev) => {
+        const existing = prev.find((c) => c.name === name);
+        if (existing) return prev.map((c) => (c.name === name ? { ...c, ...profile } : c));
+        return [...prev, { name, address: "", email: "", phone: "", headcount: 0, budget: "", ...profile }];
+      });
+      return true;
+    } catch (err) {
+      setCenterError(err instanceof Error ? err.message : "No se pudo actualizar el centro de trabajo");
+      return false;
+    }
   }
 
   if (authLoading) {
@@ -152,20 +233,25 @@ export default function App() {
         ) : activeTab === "chart" ? (
           <OrgChartView
             nodes={nodes}
+            workCenters={workCenters}
+            centerError={centerError}
             onAddNode={handleAddNode}
             onUpdateNode={handleUpdateNode}
             onDeleteNode={handleDeleteNode}
             onMoveNode={handleMoveNode}
-            onBulkUpdateNodes={handleBulkUpdateNodes}
             onSave={handleSave}
+            onCreateWorkCenter={handleCreateWorkCenter}
+            onRenameWorkCenter={handleRenameWorkCenter}
+            onDeleteWorkCenter={handleDeleteWorkCenter}
+            onUpdateWorkCenterProfile={handleUpdateWorkCenterProfile}
             saving={saving}
             dirty={dirty}
             readOnly={!isAdmin}
           />
         ) : activeTab === "ai" ? (
-          <AiGeneratorView onApply={handleApplyAiNodes} readOnly={!isAdmin} />
+          <AiGeneratorView nodes={nodes} workCenters={workCenters} onApply={handleApplyAiNodes} readOnly={!isAdmin} />
         ) : activeTab === "hr" ? (
-          <HrIntegrationView onSynced={handleHrSynced} readOnly={!isAdmin} />
+          <HrIntegrationView nodes={nodes} workCenters={workCenters} onSynced={handleHrSynced} readOnly={!isAdmin} />
         ) : (
           <ProfilesView />
         )}
