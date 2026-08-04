@@ -213,7 +213,44 @@ async function updateWorkCenterProfile(name: string, profile: Partial<Omit<WorkC
   if (error) throw new Error(error.message);
 }
 
-let apiKeysStore = [
+// User profiles (auth), sessions, integration API keys and sync logs persist in Supabase
+// (tables "app_users", "sessions", "api_keys", "sync_logs") when configured; otherwise they
+// fall back to these in-memory stores, which do NOT survive a process restart or, in
+// production on Vercel, a serverless cold start.
+interface UserRecord {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  role: "admin" | "viewer";
+  createdBy: string | null;
+  createdAt: string;
+}
+
+let inMemoryUsers: UserRecord[] = [
+  {
+    id: "user-1",
+    name: "Administrador Principal",
+    email: "admin@empresa.com",
+    password: "admin123",
+    role: "admin",
+    createdBy: null,
+    createdAt: new Date().toISOString()
+  }
+];
+
+let inMemorySessions = new Map<string, string>(); // token -> userId
+
+interface ApiKeyRecord {
+  id: string;
+  name: string;
+  key: string;
+  provider: string;
+  status: string;
+  created: string;
+}
+
+let inMemoryApiKeys: ApiKeyRecord[] = [
   {
     id: "key-1",
     name: "Workday Integration Key",
@@ -232,7 +269,16 @@ let apiKeysStore = [
   }
 ];
 
-let syncLogs = [
+interface SyncLogRecord {
+  id: string;
+  timestamp: string;
+  system: string;
+  status: string;
+  details: string;
+  nodesUpdated: number;
+}
+
+let inMemorySyncLogs: SyncLogRecord[] = [
   {
     id: "log-1",
     timestamp: new Date().toISOString(),
@@ -243,116 +289,251 @@ let syncLogs = [
   }
 ];
 
-// In-memory mock DB for user profiles (auth) and active sessions
-let usersStore = [
-  {
-    id: "user-1",
-    name: "Administrador Principal",
-    email: "admin@empresa.com",
-    password: "admin123",
-    role: "admin",
-    createdBy: null as string | null,
-    createdAt: new Date().toISOString()
-  }
-];
+function userRowToRecord(row: any): UserRecord {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    password: row.password,
+    role: row.role,
+    createdBy: row.created_by,
+    createdAt: row.created_at
+  };
+}
 
-const sessions = new Map<string, string>(); // token -> userId
+async function loadUsers(): Promise<UserRecord[]> {
+  if (!supabase) return inMemoryUsers;
+  const { data, error } = await supabase.from("app_users").select("*").order("created_at");
+  if (error) throw new Error(error.message);
+  return data.map(userRowToRecord);
+}
+
+async function createUser(user: UserRecord): Promise<void> {
+  if (!supabase) {
+    inMemoryUsers.push(user);
+    return;
+  }
+  const { error } = await supabase.from("app_users").insert({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    password: user.password,
+    role: user.role,
+    created_by: user.createdBy,
+    created_at: user.createdAt
+  });
+  if (error) throw new Error(error.message);
+}
+
+async function deleteUser(id: string): Promise<void> {
+  if (!supabase) {
+    inMemoryUsers = inMemoryUsers.filter((u) => u.id !== id);
+    return;
+  }
+  const { error } = await supabase.from("app_users").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+async function createSession(token: string, userId: string): Promise<void> {
+  if (!supabase) {
+    inMemorySessions.set(token, userId);
+    return;
+  }
+  const { error } = await supabase.from("sessions").insert({ token, user_id: userId });
+  if (error) throw new Error(error.message);
+}
+
+async function getSessionUserId(token: string): Promise<string | null> {
+  if (!supabase) return inMemorySessions.get(token) || null;
+  const { data, error } = await supabase.from("sessions").select("user_id").eq("token", token).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.user_id ?? null;
+}
+
+async function deleteSession(token: string): Promise<void> {
+  if (!supabase) {
+    inMemorySessions.delete(token);
+    return;
+  }
+  const { error } = await supabase.from("sessions").delete().eq("token", token);
+  if (error) throw new Error(error.message);
+}
+
+async function loadApiKeys(): Promise<ApiKeyRecord[]> {
+  if (!supabase) return inMemoryApiKeys;
+  const { data, error } = await supabase.from("api_keys").select("*").order("created", { ascending: false });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+async function createApiKey(key: ApiKeyRecord): Promise<void> {
+  if (!supabase) {
+    inMemoryApiKeys.push(key);
+    return;
+  }
+  const { error } = await supabase.from("api_keys").insert(key);
+  if (error) throw new Error(error.message);
+}
+
+async function loadSyncLogs(): Promise<SyncLogRecord[]> {
+  if (!supabase) return inMemorySyncLogs;
+  const { data, error } = await supabase.from("sync_logs").select("*").order("timestamp", { ascending: false });
+  if (error) throw new Error(error.message);
+  return data.map((row: any) => ({
+    id: row.id,
+    timestamp: row.timestamp,
+    system: row.system,
+    status: row.status,
+    details: row.details,
+    nodesUpdated: row.nodes_updated
+  }));
+}
+
+async function addSyncLog(log: SyncLogRecord): Promise<void> {
+  if (!supabase) {
+    inMemorySyncLogs.unshift(log);
+    return;
+  }
+  const { error } = await supabase.from("sync_logs").insert({
+    id: log.id,
+    timestamp: log.timestamp,
+    system: log.system,
+    status: log.status,
+    details: log.details,
+    nodes_updated: log.nodesUpdated
+  });
+  if (error) throw new Error(error.message);
+}
 
 function generateToken(): string {
   return "tok_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-function publicUser(u: (typeof usersStore)[number]) {
+function publicUser(u: UserRecord) {
   const { password, ...rest } = u;
   return rest;
 }
 
-function getUserFromRequest(req: express.Request) {
+async function getUserFromRequest(req: express.Request): Promise<UserRecord | null> {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  const userId = sessions.get(token);
+  if (!token) return null;
+  const userId = await getSessionUserId(token);
   if (!userId) return null;
-  return usersStore.find((u) => u.id === userId) || null;
+  const users = await loadUsers();
+  return users.find((u) => u.id === userId) || null;
 }
 
-function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const user = getUserFromRequest(req);
-  if (!user) {
-    return res.status(401).json({ error: "Sesión inválida o expirada. Inicia sesión nuevamente." });
+async function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  try {
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      return res.status(401).json({ error: "Sesión inválida o expirada. Inicia sesión nuevamente." });
+    }
+    if (user.role !== "admin") {
+      return res.status(403).json({ error: "Solo los perfiles de administrador pueden modificar el organigrama." });
+    }
+    next();
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
-  if (user.role !== "admin") {
-    return res.status(403).json({ error: "Solo los perfiles de administrador pueden modificar el organigrama." });
-  }
-  next();
 }
 
 // --- AUTH ROUTES --- //
 
-app.post("/api/auth/login", (req, res) => {
-  const { email, password } = req.body || {};
-  const user = usersStore.find((u) => u.email === email && u.password === password);
-  if (!user) {
-    return res.status(401).json({ error: "Email o contraseña incorrectos" });
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    const users = await loadUsers();
+    const user = users.find((u) => u.email === email && u.password === password);
+    if (!user) {
+      return res.status(401).json({ error: "Email o contraseña incorrectos" });
+    }
+    const token = generateToken();
+    await createSession(token, user.id);
+    res.json({ success: true, token, user: publicUser(user) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
-  const token = generateToken();
-  sessions.set(token, user.id);
-  res.json({ success: true, token, user: publicUser(user) });
 });
 
-app.get("/api/auth/me", (req, res) => {
-  const user = getUserFromRequest(req);
-  if (!user) return res.status(401).json({ error: "No autenticado" });
-  res.json({ success: true, user: publicUser(user) });
+app.get("/api/auth/me", async (req, res) => {
+  try {
+    const user = await getUserFromRequest(req);
+    if (!user) return res.status(401).json({ error: "No autenticado" });
+    res.json({ success: true, user: publicUser(user) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.post("/api/auth/logout", (req, res) => {
-  const authHeader = req.headers.authorization || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  sessions.delete(token);
-  res.json({ success: true });
+app.post("/api/auth/logout", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    await deleteSession(token);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // --- USER / PROFILE MANAGEMENT (admin only) --- //
 
-app.get("/api/v1/users", requireAdmin, (req, res) => {
-  res.json({ success: true, data: usersStore.map(publicUser) });
+app.get("/api/v1/users", requireAdmin, async (req, res) => {
+  try {
+    const users = await loadUsers();
+    res.json({ success: true, data: users.map(publicUser) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.post("/api/v1/users", requireAdmin, (req, res) => {
-  const admin = getUserFromRequest(req)!;
-  const { name, email, password, role } = req.body || {};
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: "Nombre, email y contraseña son obligatorios" });
+app.post("/api/v1/users", requireAdmin, async (req, res) => {
+  try {
+    const admin = (await getUserFromRequest(req))!;
+    const { name, email, password, role } = req.body || {};
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: "Nombre, email y contraseña son obligatorios" });
+    }
+    const users = await loadUsers();
+    if (users.some((u) => u.email === email)) {
+      return res.status(409).json({ error: "Ya existe un perfil con ese email" });
+    }
+    const newUser: UserRecord = {
+      id: "user-" + Date.now(),
+      name,
+      email,
+      password,
+      role: role === "admin" ? "admin" : "viewer",
+      createdBy: admin.id,
+      createdAt: new Date().toISOString()
+    };
+    await createUser(newUser);
+    res.json({ success: true, data: publicUser(newUser) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
-  if (usersStore.some((u) => u.email === email)) {
-    return res.status(409).json({ error: "Ya existe un perfil con ese email" });
-  }
-  const newUser = {
-    id: "user-" + Date.now(),
-    name,
-    email,
-    password,
-    role: role === "admin" ? "admin" : "viewer",
-    createdBy: admin.id,
-    createdAt: new Date().toISOString()
-  };
-  usersStore.push(newUser);
-  res.json({ success: true, data: publicUser(newUser) });
 });
 
-app.delete("/api/v1/users/:id", requireAdmin, (req, res) => {
-  const admin = getUserFromRequest(req)!;
-  if (req.params.id === admin.id) {
-    return res.status(400).json({ error: "No puedes eliminar tu propio perfil" });
+app.delete("/api/v1/users/:id", requireAdmin, async (req, res) => {
+  try {
+    const admin = (await getUserFromRequest(req))!;
+    if (req.params.id === admin.id) {
+      return res.status(400).json({ error: "No puedes eliminar tu propio perfil" });
+    }
+    const users = await loadUsers();
+    const target = users.find((u) => u.id === req.params.id);
+    if (!target) return res.status(404).json({ error: "Perfil no encontrado" });
+    const remainingAdmins = users.filter((u) => u.role === "admin" && u.id !== target.id);
+    if (target.role === "admin" && remainingAdmins.length === 0) {
+      return res.status(400).json({ error: "Debe existir al menos un perfil administrador" });
+    }
+    await deleteUser(req.params.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
-  const target = usersStore.find((u) => u.id === req.params.id);
-  if (!target) return res.status(404).json({ error: "Perfil no encontrado" });
-  const remainingAdmins = usersStore.filter((u) => u.role === "admin" && u.id !== target.id);
-  if (target.role === "admin" && remainingAdmins.length === 0) {
-    return res.status(400).json({ error: "Debe existir al menos un perfil administrador" });
-  }
-  usersStore = usersStore.filter((u) => u.id !== req.params.id);
-  res.json({ success: true });
 });
 
 // --- REST API ROUTES --- //
@@ -397,7 +578,7 @@ app.post("/api/v1/nodes/bulk-sync", requireAdmin, async (req, res) => {
   }
   try {
     await saveNodes(nodes);
-    syncLogs.unshift({
+    await addSyncLog({
       id: "log-" + Date.now(),
       timestamp: new Date().toISOString(),
       system: "Dashboard Client Sync",
@@ -512,7 +693,7 @@ app.post("/api/v1/hr/sync", requireAdmin, async (req, res) => {
       }
       await saveNodes(nextNodes);
 
-      syncLogs.unshift({
+      await addSyncLog({
         id: "log-" + Date.now(),
         timestamp: new Date().toISOString(),
         system: provider,
@@ -554,26 +735,40 @@ app.post("/api/v1/hr/sync", requireAdmin, async (req, res) => {
 });
 
 // API Keys management endpoint
-app.get("/api/v1/integrations/keys", (req, res) => {
-  res.json({ success: true, data: apiKeysStore });
+app.get("/api/v1/integrations/keys", async (req, res) => {
+  try {
+    const keys = await loadApiKeys();
+    res.json({ success: true, data: keys });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.post("/api/v1/integrations/keys", requireAdmin, (req, res) => {
-  const { name, provider } = req.body;
-  const newKey = {
-    id: "key-" + Date.now(),
-    name: name || "Nueva Clave de Integración",
-    key: "org_live_" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 8),
-    provider: provider || "API Personalizada",
-    status: "active",
-    created: new Date().toISOString().split("T")[0]
-  };
-  apiKeysStore.push(newKey);
-  res.json({ success: true, data: newKey });
+app.post("/api/v1/integrations/keys", requireAdmin, async (req, res) => {
+  try {
+    const { name, provider } = req.body;
+    const newKey: ApiKeyRecord = {
+      id: "key-" + Date.now(),
+      name: name || "Nueva Clave de Integración",
+      key: "org_live_" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 8),
+      provider: provider || "API Personalizada",
+      status: "active",
+      created: new Date().toISOString().split("T")[0]
+    };
+    await createApiKey(newKey);
+    res.json({ success: true, data: newKey });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.get("/api/v1/integrations/logs", (req, res) => {
-  res.json({ success: true, data: syncLogs });
+app.get("/api/v1/integrations/logs", async (req, res) => {
+  try {
+    const logs = await loadSyncLogs();
+    res.json({ success: true, data: logs });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Gemini AI Organigram Generator Endpoint
