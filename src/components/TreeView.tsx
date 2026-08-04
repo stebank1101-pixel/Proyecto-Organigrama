@@ -1,30 +1,11 @@
-import { forwardRef, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { getDepartmentStyle } from "../lib/departmentColors";
-import { OrgIcon } from "../lib/icons";
+import { forwardRef, useMemo, useRef, useState } from "react";
 import type { OrgNode } from "../types";
 import { NodeCard } from "./NodeCard";
 
-interface TreeHandlers {
-  onEdit: (node: OrgNode) => void;
-  onDelete: (node: OrgNode) => void;
-  onAddChild: (parent: OrgNode) => void;
-  onRemoveBoss?: (node: OrgNode) => void;
-  highlightedId?: string | null;
-  readOnly?: boolean;
-  compact?: boolean;
-}
-
-interface TreeViewProps extends TreeHandlers {
-  nodes: OrgNode[];
-  /** While on, dragging a card draws a coordination line to whatever it's released on,
-   * instead of reassigning its boss (Shift+drag also works regardless of this toggle). */
-  linkMode?: boolean;
-  onReparent?: (id: string, newParentId: string) => void;
-  onCoordinationLink?: (id: string, targetId: string) => void;
-  onCoordinationStyleToggle?: (id: string, targetId: string) => void;
-  onCoordinationLineAdjust?: (id: string, targetId: string, offsetX: number, offsetY: number) => void;
-  onCoordinationUnlink?: (id: string, targetId: string) => void;
-}
+const CARD_W = 240;
+const CARD_H_FULL = 188;
+const CARD_H_COMPACT = 92;
+const PADDING = 260;
 
 // Every descendant of `nodeId` is an invalid reparent target — dropping a node onto its
 // own descendant would create a cycle in the reporting chain.
@@ -43,124 +24,9 @@ function getDescendantIds(nodeId: string, nodes: OrgNode[]): Set<string> {
   return result;
 }
 
-function Card({
-  node,
-  onCardPointerDown,
-  isHoverTarget,
-  isDragging,
-  ...handlers
-}: {
-  node: OrgNode;
-  onCardPointerDown: (e: React.PointerEvent, node: OrgNode) => void;
-  isHoverTarget?: boolean;
-  isDragging?: boolean;
-} & TreeHandlers) {
-  return (
-    <div
-      className={`inline-block rounded-xl transition-shadow ${!handlers.readOnly ? "cursor-grab active:cursor-grabbing" : ""} ${
-        isHoverTarget ? "ring-4 ring-emerald-400 ring-offset-2" : ""
-      } ${isDragging ? "opacity-30" : ""}`}
-      data-coord-id={node.id}
-      onPointerDown={(e) => onCardPointerDown(e, node)}
-    >
-      <NodeCard
-        node={node}
-        onEdit={handlers.onEdit}
-        onDelete={handlers.onDelete}
-        onAddChild={handlers.onAddChild}
-        onRemoveBoss={handlers.onRemoveBoss}
-        highlighted={handlers.highlightedId === node.id}
-        readOnly={handlers.readOnly}
-        compact={handlers.compact}
-      />
-    </div>
-  );
-}
-
-// Past the spine, every branch stacks vertically (one report per row, joined by an
-// L-connector) instead of opening new horizontal columns, so deep branches grow
-// downward instead of stretching the whole chart sideways.
-function VerticalBranch({
-  node,
-  childrenByParent,
-  ...rest
-}: { node: OrgNode; childrenByParent: Map<string, OrgNode[]> } & Parameters<typeof Card>[0]) {
-  const children = childrenByParent.get(node.id) || [];
-  return (
-    <li className="org-vbranch-item">
-      <Card node={node} {...rest} isHoverTarget={rest.isHoverTarget} />
-      {children.length > 0 && (
-        <ul className="org-vbranch-list">
-          {children.map((child) => (
-            <VerticalBranch key={child.id} node={child} childrenByParent={childrenByParent} {...rest} />
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-}
-
-// A root's direct children (departments) form the horizontal spine row; everything
-// each one leads to renders as a vertical branch column beneath it. The colored bar
-// labels the whole branch by department, echoing the reference org chart where each
-// division gets its own color instead of coloring by seniority.
-function SpineColumn({
-  node,
-  childrenByParent,
-  ...rest
-}: { node: OrgNode; childrenByParent: Map<string, OrgNode[]> } & Parameters<typeof Card>[0]) {
-  const children = childrenByParent.get(node.id) || [];
-  const deptStyle = getDepartmentStyle(node.department);
-  return (
-    <li className="org-spine-item">
-      <div className={`mb-2 flex w-[240px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm ${deptStyle.header}`}>
-        <OrgIcon name={node.iconName} className="h-3.5 w-3.5 flex-shrink-0" />
-        <span className="truncate">{node.department || node.title}</span>
-      </div>
-      <Card node={node} {...rest} />
-      {children.length > 0 && (
-        <ul className="org-vbranch-list">
-          {children.map((child) => (
-            <VerticalBranch key={child.id} node={child} childrenByParent={childrenByParent} {...rest} />
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-}
-
-function RootBranch({
-  node,
-  childrenByParent,
-  ...rest
-}: { node: OrgNode; childrenByParent: Map<string, OrgNode[]> } & Parameters<typeof Card>[0]) {
-  const children = childrenByParent.get(node.id) || [];
-  return (
-    <li className="org-spine-item">
-      <Card node={node} {...rest} />
-      {children.length > 0 && (
-        <ul className="org-spine-row">
-          {children.map((child) => (
-            <SpineColumn key={child.id} node={child} childrenByParent={childrenByParent} {...rest} />
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-}
-
-interface MeasuredCoordLine {
-  id: string;
-  targetId: string;
-  style: "solid" | "dashed";
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  midX: number;
-  midY: number;
-}
-
+// Point where a ray from a card's center toward another point exits that card's
+// rectangle — used so a coordination line (and its control icons) stops at the card's
+// edge instead of cutting through it, which would hide the icons under the card next to it.
 function clipToRectEdge(cx: number, cy: number, towardX: number, towardY: number, w: number, h: number): { x: number; y: number } {
   const dx = towardX - cx;
   const dy = towardY - cy;
@@ -173,6 +39,29 @@ function clipToRectEdge(cx: number, cy: number, towardX: number, towardY: number
   return { x: cx + dx * t, y: cy + dy * t };
 }
 
+interface TreeViewProps {
+  nodes: OrgNode[];
+  onEdit: (node: OrgNode) => void;
+  onDelete: (node: OrgNode) => void;
+  onAddChild: (parent: OrgNode) => void;
+  onRemoveBoss?: (node: OrgNode) => void;
+  onNodeMove: (id: string, x: number, y: number) => void;
+  onReparent?: (id: string, newParentId: string) => void;
+  onLineAdjust?: (id: string, offsetX: number, offsetY: number) => void;
+  onLineReset?: (id: string) => void;
+  onLineDelete?: (id: string) => void;
+  onCoordinationLink?: (id: string, targetId: string) => void;
+  onCoordinationStyleToggle?: (id: string, targetId: string) => void;
+  onCoordinationLineAdjust?: (id: string, targetId: string, offsetX: number, offsetY: number) => void;
+  onCoordinationUnlink?: (id: string, targetId: string) => void;
+  highlightedId?: string | null;
+  readOnly?: boolean;
+  compact?: boolean;
+  /** While on, dragging a card draws a coordination line to whatever it's released on,
+   * instead of moving/reparenting it (Shift+drag also works regardless of this toggle). */
+  linkMode?: boolean;
+}
+
 export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeView(
   {
     nodes,
@@ -180,36 +69,56 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     onDelete,
     onAddChild,
     onRemoveBoss,
-    highlightedId,
-    readOnly,
-    compact,
-    linkMode,
+    onNodeMove,
     onReparent,
+    onLineAdjust,
+    onLineReset,
+    onLineDelete,
     onCoordinationLink,
     onCoordinationStyleToggle,
     onCoordinationLineAdjust,
     onCoordinationUnlink,
+    highlightedId,
+    readOnly,
+    compact,
+    linkMode,
   },
-  ref
+  forwardedRef
 ) {
-  const innerRef = useRef<HTMLDivElement | null>(null);
-  const reparentDrag = useRef<{ id: string; blockedIds: Set<string> } | null>(null);
-  const linkDrag = useRef<{ id: string } | null>(null);
-  const coordBendDrag = useRef<{ id: string; targetId: string; grabOffsetX: number; grabOffsetY: number } | null>(null);
-  const [, bumpTick] = useState(0);
-  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
-  const [reparentHoverId, setReparentHoverId] = useState<string | null>(null);
+  const dragState = useRef<{ id: string; offsetX: number; offsetY: number; blockedIds: Set<string> } | null>(null);
+  // grabOffsetX/Y is the pointer's distance from the CURRENT absolute bend point at drag
+  // start; each move re-derives a fresh offset-from-default since the connected cards'
+  // live positions (and therefore the natural midpoint) can shift frame to frame.
+  const lineDragState = useRef<{ id: string; grabOffsetX: number; grabOffsetY: number } | null>(null);
+  const coordLineDragState = useRef<{ id: string; targetId: string; grabOffsetX: number; grabOffsetY: number } | null>(null);
+  // Shift+drag (or Conectar líneas mode) from a card draws a dotted coordination line to
+  // whatever card it's released on, instead of moving the card.
+  const linkDragState = useRef<{ id: string } | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [, forceRerender] = useState(0);
+  const [hoverTargetId, setHoverTargetId] = useState<string | null>(null);
   const [linkHoverId, setLinkHoverId] = useState<string | null>(null);
   const [linkPreviewPos, setLinkPreviewPos] = useState<{ x: number; y: number } | null>(null);
-  const [coordSize, setCoordSize] = useState({ width: 0, height: 0 });
+  const CARD_H = compact ? CARD_H_COMPACT : CARD_H_FULL;
 
-  // The chart is often much wider/taller than the viewport (many branches, or — like a
-  // broken hierarchy with an orphaned root — two trees far apart). Without auto-scroll, a
-  // drop target that's off-screen is simply unreachable: the cursor can't move past the
-  // edge of the browser window, so the drag looks "frozen" even though it's working.
+  // Auto-scroll while a drag's cursor nears the edge of the scrollable viewport — without
+  // this, a card or coordination target that's off-screen (common on a big free canvas)
+  // would simply be unreachable, since the cursor can't move past the browser window edge.
   const scrollAncestorRef = useRef<HTMLElement | null>(null);
   const dragCursorPos = useRef<{ x: number; y: number } | null>(null);
   const autoScrollRaf = useRef<number | null>(null);
+
+  const nodesById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+
+  const bounds = useMemo(() => {
+    let maxX = 800;
+    let maxY = 600;
+    for (const n of nodes) {
+      maxX = Math.max(maxX, n.freeX + CARD_W);
+      maxY = Math.max(maxY, n.freeY + CARD_H);
+    }
+    return { width: maxX + PADDING, height: maxY + PADDING };
+  }, [nodes, CARD_H]);
 
   function findScrollableAncestor(el: HTMLElement | null): HTMLElement | null {
     let cur = el?.parentElement ?? null;
@@ -224,7 +133,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
   }
 
   function startAutoScroll() {
-    scrollAncestorRef.current = findScrollableAncestor(innerRef.current);
+    scrollAncestorRef.current = findScrollableAncestor(rootRef.current);
     if (autoScrollRaf.current !== null) return;
     const EDGE = 70;
     const MAX_SPEED = 22;
@@ -242,7 +151,6 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
         if (dx !== 0 || dy !== 0) {
           container.scrollLeft += dx;
           container.scrollTop += dy;
-          bumpTick((v) => v + 1);
         }
       }
       autoScrollRaf.current = requestAnimationFrame(tick);
@@ -258,98 +166,13 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     dragCursorPos.current = null;
   }
 
-  function setRefs(el: HTMLDivElement | null) {
-    innerRef.current = el;
-    if (typeof ref === "function") ref(el);
-    else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
+  function setRootRef(el: HTMLDivElement | null) {
+    rootRef.current = el;
+    if (typeof forwardedRef === "function") forwardedRef(el);
+    else if (forwardedRef) (forwardedRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
   }
 
-  const { roots, childrenByParent, nodesById } = useMemo(() => {
-    const ids = new Set(nodes.map((n) => n.id));
-    const map = new Map<string, OrgNode[]>();
-    const rootList: OrgNode[] = [];
-    for (const node of nodes) {
-      if (node.parentId && ids.has(node.parentId)) {
-        const list = map.get(node.parentId) || [];
-        list.push(node);
-        map.set(node.parentId, list);
-      } else {
-        rootList.push(node);
-      }
-    }
-    return { roots: rootList, childrenByParent: map, nodesById: new Map(nodes.map((n) => [n.id, n])) };
-  }, [nodes]);
-
-  // Coordination lines are measured from the actual rendered card positions (this view
-  // has no x/y of its own — cards sit wherever normal document flow puts them), and
-  // re-measured on every drag tick so a bend drag redraws live instead of only on drop.
-  const coordLines = useMemo<MeasuredCoordLine[]>(() => {
-    const containerEl = innerRef.current;
-    if (!containerEl) return [];
-    const containerRect = containerEl.getBoundingClientRect();
-    const next: MeasuredCoordLine[] = [];
-    for (const node of nodes) {
-      for (const link of node.coordinationLinks || []) {
-        const fromEl = containerEl.querySelector(`[data-coord-id="${CSS.escape(node.id)}"]`);
-        const toEl = containerEl.querySelector(`[data-coord-id="${CSS.escape(link.targetId)}"]`);
-        if (!fromEl || !toEl) continue;
-        const a = fromEl.getBoundingClientRect();
-        const b = toEl.getBoundingClientRect();
-        const cx1 = a.left + a.width / 2 - containerRect.left;
-        const cy1 = a.top + a.height / 2 - containerRect.top;
-        const cx2 = b.left + b.width / 2 - containerRect.left;
-        const cy2 = b.top + b.height / 2 - containerRect.top;
-        const p1 = clipToRectEdge(cx1, cy1, cx2, cy2, a.width, a.height);
-        const p2 = clipToRectEdge(cx2, cy2, cx1, cy1, b.width, b.height);
-        const midX = (p1.x + p2.x) / 2 + (link.offsetX ?? 0);
-        const midY = (p1.y + p2.y) / 2 + (link.offsetY ?? 0);
-        next.push({ id: node.id, targetId: link.targetId, style: link.style, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, midX, midY });
-      }
-    }
-    return next;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, ghostPos, linkPreviewPos]);
-
-  useLayoutEffect(() => {
-    const container = innerRef.current;
-    if (!container) return;
-    function measure() {
-      const el = innerRef.current;
-      if (!el) return;
-      setCoordSize({ width: el.scrollWidth, height: el.scrollHeight });
-      bumpTick((v) => v + 1);
-    }
-    measure();
-    const resizeObserver = new ResizeObserver(measure);
-    resizeObserver.observe(container);
-    window.addEventListener("resize", measure);
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, [nodes]);
-
-  useLayoutEffect(() => stopAutoScroll, []);
-
-  function measureDefaultMid(nodeId: string, targetId: string): { x: number; y: number } | null {
-    const containerEl = innerRef.current;
-    if (!containerEl) return null;
-    const fromEl = containerEl.querySelector(`[data-coord-id="${CSS.escape(nodeId)}"]`);
-    const toEl = containerEl.querySelector(`[data-coord-id="${CSS.escape(targetId)}"]`);
-    if (!fromEl || !toEl) return null;
-    const containerRect = containerEl.getBoundingClientRect();
-    const a = fromEl.getBoundingClientRect();
-    const b = toEl.getBoundingClientRect();
-    const cx1 = a.left + a.width / 2 - containerRect.left;
-    const cy1 = a.top + a.height / 2 - containerRect.top;
-    const cx2 = b.left + b.width / 2 - containerRect.left;
-    const cy2 = b.top + b.height / 2 - containerRect.top;
-    const p1 = clipToRectEdge(cx1, cy1, cx2, cy2, a.width, a.height);
-    const p2 = clipToRectEdge(cx2, cy2, cx1, cy1, b.width, b.height);
-    return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-  }
-
-  function handleCardPointerDown(e: React.PointerEvent, node: OrgNode) {
+  function handlePointerDown(e: React.PointerEvent, node: OrgNode) {
     if (readOnly) return;
     const target = e.target as HTMLElement;
     if (target.closest("button")) return;
@@ -357,96 +180,201 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     document.body.style.userSelect = "none";
 
     if (e.shiftKey || linkMode) {
-      linkDrag.current = { id: node.id };
-      setLinkPreviewPos({ x: e.clientX, y: e.clientY });
+      linkDragState.current = { id: node.id };
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
       startAutoScroll();
       return;
     }
 
-    reparentDrag.current = { id: node.id, blockedIds: getDescendantIds(node.id, nodes) };
-    setGhostPos({ x: e.clientX, y: e.clientY });
+    dragState.current = {
+      id: node.id,
+      offsetX: e.clientX - node.freeX,
+      offsetY: e.clientY - node.freeY,
+      blockedIds: getDescendantIds(node.id, nodes),
+    };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     startAutoScroll();
   }
 
-  function handleCoordBendPointerDown(e: React.PointerEvent, nodeId: string, targetId: string, midX: number, midY: number) {
+  // The connector's natural (no manual bend) midpoint, recomputed from the two cards'
+  // LIVE positions — this is what a stored offset is relative to.
+  function getDefaultMid(node: OrgNode): { x: number; y: number } | null {
+    if (!node.parentId) return null;
+    const parent = nodesById.get(node.parentId);
+    if (!parent) return null;
+    const x1 = parent.freeX + CARD_W / 2;
+    const y1 = parent.freeY + CARD_H;
+    const x2 = node.freeX + CARD_W / 2;
+    const y2 = node.freeY;
+    return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+  }
+
+  function getCoordDefaultMid(node: OrgNode, target: OrgNode): { x: number; y: number } {
+    const cx1 = node.freeX + CARD_W / 2;
+    const cy1 = node.freeY + CARD_H / 2;
+    const cx2 = target.freeX + CARD_W / 2;
+    const cy2 = target.freeY + CARD_H / 2;
+    const p1 = clipToRectEdge(cx1, cy1, cx2, cy2, CARD_W, CARD_H);
+    const p2 = clipToRectEdge(cx2, cy2, cx1, cy1, CARD_W, CARD_H);
+    return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+  }
+
+  function handleLinePointerDown(e: React.PointerEvent, nodeId: string, midX: number, midY: number) {
     if (readOnly) return;
     e.preventDefault();
     e.stopPropagation();
     document.body.style.userSelect = "none";
-    coordBendDrag.current = { id: nodeId, targetId, grabOffsetX: e.clientX - midX, grabOffsetY: e.clientY - midY };
+    lineDragState.current = { id: nodeId, grabOffsetX: e.clientX - midX, grabOffsetY: e.clientY - midY };
     (e.target as SVGElement).setPointerCapture(e.pointerId);
-    startAutoScroll();
   }
 
-  function hitTest(clientX: number, clientY: number): string | null {
-    const el = document.elementFromPoint(clientX, clientY)?.closest("[data-coord-id]") as HTMLElement | null;
-    return el?.getAttribute("data-coord-id") || null;
+  function handleLineDoubleClick(e: React.MouseEvent, nodeId: string) {
+    if (readOnly) return;
+    e.stopPropagation();
+    const node = nodesById.get(nodeId);
+    if (node) {
+      node.lineOffsetX = undefined;
+      node.lineOffsetY = undefined;
+      forceRerender((v) => v + 1);
+    }
+    onLineReset?.(nodeId);
   }
 
-  function handleContainerPointerMove(e: React.PointerEvent) {
+  function handleCoordLinePointerDown(e: React.PointerEvent, nodeId: string, targetId: string, midX: number, midY: number) {
+    if (readOnly) return;
+    e.preventDefault();
+    e.stopPropagation();
+    document.body.style.userSelect = "none";
+    coordLineDragState.current = { id: nodeId, targetId, grabOffsetX: e.clientX - midX, grabOffsetY: e.clientY - midY };
+    (e.target as SVGElement).setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e: React.PointerEvent) {
     dragCursorPos.current = { x: e.clientX, y: e.clientY };
 
-    if (linkDrag.current) {
-      setLinkPreviewPos({ x: e.clientX, y: e.clientY });
-      const hovered = hitTest(e.clientX, e.clientY);
-      setLinkHoverId(hovered && hovered !== linkDrag.current.id ? hovered : null);
+    if (linkDragState.current) {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const localX = e.clientX - rect.left;
+      const localY = e.clientY - rect.top;
+      setLinkPreviewPos({ x: localX, y: localY });
+      let hovered: string | null = null;
+      for (const other of nodes) {
+        if (other.id === linkDragState.current.id) continue;
+        if (localX >= other.freeX && localX <= other.freeX + CARD_W && localY >= other.freeY && localY <= other.freeY + CARD_H) {
+          hovered = other.id;
+          break;
+        }
+      }
+      setLinkHoverId(hovered);
       return;
     }
 
-    if (coordBendDrag.current) {
-      const drag = coordBendDrag.current;
-      const node = nodesById.get(drag.id);
-      const link = node?.coordinationLinks?.find((l) => l.targetId === drag.targetId);
-      const defaultMid = measureDefaultMid(drag.id, drag.targetId);
-      if (link && defaultMid) {
-        link.offsetX = e.clientX - drag.grabOffsetX - defaultMid.x;
-        link.offsetY = e.clientY - drag.grabOffsetY - defaultMid.y;
-        bumpTick((v) => v + 1);
+    const coordDrag = coordLineDragState.current;
+    if (coordDrag) {
+      const node = nodesById.get(coordDrag.id);
+      const target = nodesById.get(coordDrag.targetId);
+      if (node && target) {
+        const defaultMid = getCoordDefaultMid(node, target);
+        const link = (node.coordinationLinks || []).find((l) => l.targetId === coordDrag.targetId);
+        if (link) {
+          link.offsetX = e.clientX - coordDrag.grabOffsetX - defaultMid.x;
+          link.offsetY = e.clientY - coordDrag.grabOffsetY - defaultMid.y;
+          forceRerender((v) => v + 1);
+        }
       }
       return;
     }
 
-    if (reparentDrag.current) {
-      setGhostPos({ x: e.clientX, y: e.clientY });
-      const hovered = hitTest(e.clientX, e.clientY);
-      const valid = hovered && hovered !== reparentDrag.current.id && !reparentDrag.current.blockedIds.has(hovered);
-      setReparentHoverId(valid ? hovered : null);
+    const lineDrag = lineDragState.current;
+    if (lineDrag) {
+      const node = nodesById.get(lineDrag.id);
+      const defaultMid = node ? getDefaultMid(node) : null;
+      if (node && defaultMid) {
+        const absMidX = e.clientX - lineDrag.grabOffsetX;
+        const absMidY = e.clientY - lineDrag.grabOffsetY;
+        node.lineOffsetX = absMidX - defaultMid.x;
+        node.lineOffsetY = absMidY - defaultMid.y;
+        forceRerender((v) => v + 1);
+      }
+      return;
     }
+
+    const drag = dragState.current;
+    if (!drag) return;
+    const node = nodesById.get(drag.id);
+    if (!node) return;
+    const nextX = Math.max(0, e.clientX - drag.offsetX);
+    const nextY = Math.max(0, e.clientY - drag.offsetY);
+    node.freeX = nextX;
+    node.freeY = nextY;
+
+    // Drop the dragged card's center onto another card to reassign its reporting line.
+    const cx = nextX + CARD_W / 2;
+    const cy = nextY + CARD_H / 2;
+    let hovered: string | null = null;
+    for (const other of nodes) {
+      if (other.id === node.id || drag.blockedIds.has(other.id)) continue;
+      if (cx >= other.freeX && cx <= other.freeX + CARD_W && cy >= other.freeY && cy <= other.freeY + CARD_H) {
+        hovered = other.id;
+        break;
+      }
+    }
+    setHoverTargetId(hovered);
+    forceRerender((v) => v + 1);
   }
 
-  function handleContainerPointerUp() {
+  function handlePointerUp() {
     stopAutoScroll();
 
-    if (linkDrag.current) {
-      if (linkHoverId) onCoordinationLink?.(linkDrag.current.id, linkHoverId);
-      linkDrag.current = null;
+    if (linkDragState.current) {
+      const sourceId = linkDragState.current.id;
+      if (linkHoverId && linkHoverId !== sourceId) {
+        onCoordinationLink?.(sourceId, linkHoverId);
+      }
+      linkDragState.current = null;
       setLinkHoverId(null);
       setLinkPreviewPos(null);
       document.body.style.userSelect = "";
       return;
     }
 
-    if (coordBendDrag.current) {
-      const drag = coordBendDrag.current;
+    if (coordLineDragState.current) {
+      const drag = coordLineDragState.current;
       const node = nodesById.get(drag.id);
       const link = node?.coordinationLinks?.find((l) => l.targetId === drag.targetId);
       if (link && link.offsetX !== undefined && link.offsetY !== undefined) {
         onCoordinationLineAdjust?.(drag.id, drag.targetId, link.offsetX, link.offsetY);
       }
-      coordBendDrag.current = null;
       document.body.style.userSelect = "";
+      coordLineDragState.current = null;
       return;
     }
 
-    if (reparentDrag.current) {
-      if (reparentHoverId) onReparent?.(reparentDrag.current.id, reparentHoverId);
-      reparentDrag.current = null;
-      setReparentHoverId(null);
-      setGhostPos(null);
+    if (lineDragState.current) {
+      const drag = lineDragState.current;
+      const node = nodesById.get(drag.id);
+      if (node && node.lineOffsetX !== undefined && node.lineOffsetY !== undefined) {
+        onLineAdjust?.(node.id, node.lineOffsetX, node.lineOffsetY);
+      }
+      document.body.style.userSelect = "";
+      lineDragState.current = null;
+      return;
+    }
+
+    if (dragState.current) {
+      const drag = dragState.current;
+      const node = nodesById.get(drag.id);
+      if (node) {
+        onNodeMove(node.id, node.freeX, node.freeY);
+        if (hoverTargetId && hoverTargetId !== node.parentId && onReparent) {
+          onReparent(node.id, hoverTargetId);
+        }
+      }
       document.body.style.userSelect = "";
     }
+    dragState.current = null;
+    setHoverTargetId(null);
   }
 
   if (nodes.length === 0) {
@@ -457,141 +385,176 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     );
   }
 
-  const draggedId = reparentDrag.current?.id ?? null;
-  const handlers = {
-    onEdit,
-    onDelete,
-    onAddChild,
-    onRemoveBoss,
-    highlightedId,
-    readOnly,
-    compact,
-    onCardPointerDown: handleCardPointerDown,
-  };
-
   return (
     <div
-      ref={setRefs}
-      className="org-tree relative min-w-max px-10 py-8"
-      onPointerMove={handleContainerPointerMove}
-      onPointerUp={handleContainerPointerUp}
-      onPointerLeave={handleContainerPointerUp}
+      ref={setRootRef}
+      className="relative"
+      style={{ width: bounds.width, height: bounds.height }}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
     >
-      <ul className="org-spine-row">
-        {roots.map((root) => (
-          <RootBranch
-            key={root.id}
-            node={root}
-            childrenByParent={childrenByParent}
-            {...handlers}
-            isHoverTarget={reparentHoverId === root.id || linkHoverId === root.id}
-            isDragging={draggedId === root.id}
-          />
-        ))}
-      </ul>
-
-      {coordLines.length > 0 && (
-        <svg
-          className="pointer-events-none absolute left-0 top-0"
-          width={coordSize.width}
-          height={coordSize.height}
-          style={{ width: coordSize.width, height: coordSize.height }}
-        >
-          {coordLines.map((line) => (
-            <g key={`${line.id}->${line.targetId}`}>
-              <path
-                d={`M ${line.x1} ${line.y1} Q ${line.midX} ${line.midY} ${line.x2} ${line.y2}`}
-                fill="none"
-                stroke="rgba(168,85,247,0.7)"
-                strokeWidth={2}
-                strokeDasharray={line.style === "dashed" ? "6 4" : undefined}
-              />
+      <svg className="pointer-events-none absolute inset-0" width={bounds.width} height={bounds.height}>
+        {nodes.map((node) => {
+          if (!node.parentId) return null;
+          const parent = nodesById.get(node.parentId);
+          if (!parent) return null;
+          const x1 = parent.freeX + CARD_W / 2;
+          const y1 = parent.freeY + CARD_H;
+          const x2 = node.freeX + CARD_W / 2;
+          const y2 = node.freeY;
+          const midX = (x1 + x2) / 2 + (node.lineOffsetX ?? 0);
+          const midY = (y1 + y2) / 2 + (node.lineOffsetY ?? 0);
+          return (
+            <g key={node.id}>
+              <path d={`M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`} fill="none" stroke="rgba(100,116,139,0.35)" strokeWidth={2} />
               {!readOnly && (
                 <>
                   <circle
-                    cx={line.midX}
-                    cy={line.midY}
+                    cx={midX}
+                    cy={midY}
                     r={7}
                     className="fill-white stroke-sky-400 hover:fill-sky-100"
                     strokeWidth={2}
                     style={{ pointerEvents: "auto", cursor: "grab", touchAction: "none" }}
-                    onPointerDown={(e) => handleCoordBendPointerDown(e, line.id, line.targetId, line.midX, line.midY)}
+                    onPointerDown={(e) => handleLinePointerDown(e, node.id, midX, midY)}
+                    onDoubleClick={(e) => handleLineDoubleClick(e, node.id)}
                   >
-                    <title>Arrastra para curvar esta línea de coordinación</title>
+                    <title>Arrastra para curvar esta conexión (doble clic para restablecer)</title>
                   </circle>
                   <g
-                    transform={`translate(${line.midX - 20}, ${line.midY - 20})`}
+                    transform={`translate(${midX + 18}, ${midY - 18})`}
                     style={{ pointerEvents: "auto", cursor: "pointer" }}
-                    onClick={() => onCoordinationStyleToggle?.(line.id, line.targetId)}
-                  >
-                    <circle r={7} className="fill-white stroke-slate-400 hover:fill-slate-50" strokeWidth={2} />
-                    <line
-                      x1={-3.5}
-                      y1={0}
-                      x2={3.5}
-                      y2={0}
-                      stroke="rgb(100,116,139)"
-                      strokeWidth={1.5}
-                      strokeDasharray={line.style === "dashed" ? "2 1.5" : undefined}
-                    />
-                    <title>{line.style === "dashed" ? "Cambiar a línea continua" : "Cambiar a línea punteada"}</title>
-                  </g>
-                  <g
-                    transform={`translate(${line.midX + 20}, ${line.midY - 20})`}
-                    style={{ pointerEvents: "auto", cursor: "pointer" }}
-                    onClick={() => onCoordinationUnlink?.(line.id, line.targetId)}
+                    onClick={() => onLineDelete?.(node.id)}
                   >
                     <circle r={7} className="fill-white stroke-rose-400 hover:fill-rose-50" strokeWidth={2} />
                     <text textAnchor="middle" dominantBaseline="central" fontSize={10} className="select-none fill-rose-500">
                       ×
                     </text>
-                    <title>Quitar esta línea de coordinación</title>
+                    <title>Quitar esta línea (el nodo queda sin jefe)</title>
                   </g>
                 </>
               )}
             </g>
-          ))}
-        </svg>
-      )}
+          );
+        })}
 
-      {/* Live preview while shift/link-mode dragging a new coordination line. */}
-      {linkDrag.current &&
-        linkPreviewPos &&
-        (() => {
-          const el = innerRef.current?.querySelector(`[data-coord-id="${CSS.escape(linkDrag.current!.id)}"]`);
-          if (!el) return null;
-          const rect = el.getBoundingClientRect();
-          return (
-            <svg className="pointer-events-none fixed left-0 top-0 z-40" width="100vw" height="100vh">
+        {/* Functional-coordination lines — independent of the reporting hierarchy. Each
+            picks its own solid/dashed style and can be bent like the hierarchy line. */}
+        {nodes.flatMap((node) =>
+          (node.coordinationLinks || []).map((link) => {
+            const target = nodesById.get(link.targetId);
+            if (!target) return null;
+            const cx1 = node.freeX + CARD_W / 2;
+            const cy1 = node.freeY + CARD_H / 2;
+            const cx2 = target.freeX + CARD_W / 2;
+            const cy2 = target.freeY + CARD_H / 2;
+            const p1 = clipToRectEdge(cx1, cy1, cx2, cy2, CARD_W, CARD_H);
+            const p2 = clipToRectEdge(cx2, cy2, cx1, cy1, CARD_W, CARD_H);
+            const midX = (p1.x + p2.x) / 2 + (link.offsetX ?? 0);
+            const midY = (p1.y + p2.y) / 2 + (link.offsetY ?? 0);
+            return (
+              <g key={`${node.id}->${link.targetId}`}>
+                <path
+                  d={`M ${p1.x} ${p1.y} Q ${midX} ${midY} ${p2.x} ${p2.y}`}
+                  fill="none"
+                  stroke="rgba(168,85,247,0.7)"
+                  strokeWidth={2}
+                  strokeDasharray={link.style === "dashed" ? "6 4" : undefined}
+                />
+                {!readOnly && (
+                  <>
+                    <circle
+                      cx={midX}
+                      cy={midY}
+                      r={7}
+                      className="fill-white stroke-sky-400 hover:fill-sky-100"
+                      strokeWidth={2}
+                      style={{ pointerEvents: "auto", cursor: "grab", touchAction: "none" }}
+                      onPointerDown={(e) => handleCoordLinePointerDown(e, node.id, link.targetId, midX, midY)}
+                    >
+                      <title>Arrastra para curvar esta línea de coordinación</title>
+                    </circle>
+                    <g
+                      transform={`translate(${midX - 20}, ${midY - 20})`}
+                      style={{ pointerEvents: "auto", cursor: "pointer" }}
+                      onClick={() => onCoordinationStyleToggle?.(node.id, link.targetId)}
+                    >
+                      <circle r={7} className="fill-white stroke-slate-400 hover:fill-slate-50" strokeWidth={2} />
+                      <line
+                        x1={-3.5}
+                        y1={0}
+                        x2={3.5}
+                        y2={0}
+                        stroke="rgb(100,116,139)"
+                        strokeWidth={1.5}
+                        strokeDasharray={link.style === "dashed" ? "2 1.5" : undefined}
+                      />
+                      <title>{link.style === "dashed" ? "Cambiar a línea continua" : "Cambiar a línea punteada"}</title>
+                    </g>
+                    <g
+                      transform={`translate(${midX + 20}, ${midY - 20})`}
+                      style={{ pointerEvents: "auto", cursor: "pointer" }}
+                      onClick={() => onCoordinationUnlink?.(node.id, link.targetId)}
+                    >
+                      <circle r={7} className="fill-white stroke-rose-400 hover:fill-rose-50" strokeWidth={2} />
+                      <text textAnchor="middle" dominantBaseline="central" fontSize={10} className="select-none fill-rose-500">
+                        ×
+                      </text>
+                      <title>Quitar esta línea de coordinación</title>
+                    </g>
+                  </>
+                )}
+              </g>
+            );
+          })
+        )}
+
+        {/* Live preview while shift/link-mode dragging a new coordination line. */}
+        {linkDragState.current &&
+          linkPreviewPos &&
+          (() => {
+            const source = nodesById.get(linkDragState.current!.id);
+            if (!source) return null;
+            const x1 = source.freeX + CARD_W / 2;
+            const y1 = source.freeY + CARD_H / 2;
+            return (
               <line
-                x1={rect.left + rect.width / 2}
-                y1={rect.top + rect.height / 2}
+                x1={x1}
+                y1={y1}
                 x2={linkPreviewPos.x}
                 y2={linkPreviewPos.y}
                 stroke="rgba(168,85,247,0.6)"
                 strokeWidth={2}
                 strokeDasharray="6 4"
               />
-            </svg>
-          );
-        })()}
+            );
+          })()}
+      </svg>
 
-      {/* Drag ghost while reparenting — the original card dims in place (see Card's
-          isDragging), this floating copy follows the cursor. */}
-      {reparentDrag.current &&
-        ghostPos &&
-        (() => {
-          const node = nodesById.get(reparentDrag.current!.id);
-          if (!node) return null;
-          return (
-            <div
-              className="pointer-events-none fixed z-40 -translate-x-1/2 -translate-y-1/2 rotate-2 opacity-90 drop-shadow-xl"
-              style={{ left: ghostPos.x, top: ghostPos.y }}
-            >
-              <NodeCard node={node} onEdit={() => {}} onDelete={() => {}} onAddChild={() => {}} readOnly compact={compact} />
-            </div>
-          );
-        })()}
+      {nodes.map((node) => (
+        <div
+          key={node.id}
+          className={`absolute transition-shadow ${readOnly ? "" : linkMode ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"} ${
+            dragState.current?.id === node.id ? "z-30 opacity-90 drop-shadow-lg" : ""
+          } ${hoverTargetId === node.id ? "rounded-xl ring-4 ring-emerald-400 ring-offset-2" : ""} ${
+            linkHoverId === node.id ? "rounded-xl ring-4 ring-purple-400 ring-offset-2" : ""
+          }`}
+          style={{ left: node.freeX, top: node.freeY, touchAction: "none" }}
+          onPointerDown={(e) => handlePointerDown(e, node)}
+        >
+          <NodeCard
+            node={node}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onAddChild={onAddChild}
+            onRemoveBoss={onRemoveBoss}
+            highlighted={highlightedId === node.id}
+            readOnly={readOnly}
+            compact={compact}
+          />
+        </div>
+      ))}
     </div>
   );
 });

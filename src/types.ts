@@ -45,6 +45,11 @@ export interface OrgNode {
   textColor?: string;
   fontFamily?: string;
   customIcon?: string;
+  /** Manual bend for the connector line coming from this node's parent, stored as an
+   * offset from the automatic midpoint (not an absolute point) so the curve's shape
+   * stays put as either connected card is dragged around. Undefined = no manual bend. */
+  lineOffsetX?: number;
+  lineOffsetY?: number;
   /** Other nodes this one has a "functional coordination" line to — independent of the
    * parentId hierarchy (a node can have several of these). Each link picks its own
    * solid/dashed style (same convention as the reference org chart's line legend) and can

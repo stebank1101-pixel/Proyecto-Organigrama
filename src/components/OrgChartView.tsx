@@ -22,7 +22,10 @@ interface OrgChartViewProps {
   onAddNode: (node: OrgNode) => void;
   onUpdateNode: (node: OrgNode) => void;
   onDeleteNode: (id: string) => void;
+  onMoveNode: (id: string, x: number, y: number) => void;
   onReparentNode: (id: string, newParentId: string) => void;
+  onLineAdjust: (id: string, offsetX: number, offsetY: number) => void;
+  onLineReset: (id: string) => void;
   onLineDelete: (id: string) => void;
   onCoordinationLink: (id: string, targetId: string) => void;
   onCoordinationStyleToggle: (id: string, targetId: string) => void;
@@ -72,7 +75,10 @@ export function OrgChartView({
   onAddNode,
   onUpdateNode,
   onDeleteNode,
+  onMoveNode,
   onReparentNode,
+  onLineAdjust,
+  onLineReset,
   onLineDelete,
   onCoordinationLink,
   onCoordinationStyleToggle,
@@ -390,7 +396,7 @@ export function OrgChartView({
             <p className={`border-b px-4 py-1.5 text-[11px] ${linkMode ? "border-purple-200 bg-purple-50 text-purple-700" : "border-slate-200 bg-sky-50 text-sky-700"}`}>
               {linkMode
                 ? "Modo conectar activo: arrastra de una tarjeta a otra para crear una línea punteada de coordinación. Vuelve a hacer clic en \"Conectando...\" para salir."
-                : "Arrastra una tarjeta sobre otra para reasignar su jefe directo, usa el ícono de desvincular en una tarjeta para quitarle el jefe, o el botón \"Conectar líneas\" para crear conexiones de coordinación."}
+                : "Arrastra cualquier tarjeta a donde quieras. Suéltala sobre otra para reasignar su jefe directo, usa el ícono de desvincular para quitarle el jefe, o el botón \"Conectar líneas\" para crear conexiones de coordinación."}
             </p>
           )}
 
@@ -412,10 +418,13 @@ export function OrgChartView({
                   onDelete={setDeleteTarget}
                   onAddChild={(p) => openCreate(p.id)}
                   onRemoveBoss={readOnly ? undefined : (node) => onLineDelete(node.id)}
+                  onNodeMove={onMoveNode}
                   readOnly={readOnly}
                   compact={compact}
                   linkMode={linkMode}
                   onReparent={readOnly ? undefined : onReparentNode}
+                  onLineAdjust={readOnly ? undefined : onLineAdjust}
+                  onLineReset={readOnly ? undefined : onLineReset}
                   onCoordinationLink={readOnly ? undefined : onCoordinationLink}
                   onCoordinationStyleToggle={readOnly ? undefined : onCoordinationStyleToggle}
                   onCoordinationLineAdjust={readOnly ? undefined : onCoordinationLineAdjust}
