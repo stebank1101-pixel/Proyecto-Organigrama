@@ -1,29 +1,7 @@
 import { Mail, Pencil, Phone, Plus, Trash2, Users2 } from "lucide-react";
+import { getDepartmentStyle } from "../lib/departmentColors";
 import { OrgIcon } from "../lib/icons";
 import type { OrgNode } from "../types";
-
-const ROLE_STYLES: Record<OrgNode["roleType"], { ring: string; badge: string; iconBg: string }> = {
-  executive: {
-    ring: "ring-amber-300 border-amber-300",
-    badge: "bg-amber-50 text-amber-700 border-amber-200",
-    iconBg: "bg-amber-500",
-  },
-  director: {
-    ring: "ring-sky-300 border-sky-300",
-    badge: "bg-sky-50 text-sky-700 border-sky-200",
-    iconBg: "bg-sky-500",
-  },
-  manager: {
-    ring: "ring-emerald-300 border-emerald-300",
-    badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    iconBg: "bg-emerald-500",
-  },
-  employee: {
-    ring: "ring-slate-300 border-slate-300",
-    badge: "bg-slate-100 text-slate-600 border-slate-200",
-    iconBg: "bg-slate-500",
-  },
-};
 
 const ROLE_LABEL: Record<OrgNode["roleType"], string> = {
   executive: "Ejecutivo",
@@ -46,7 +24,7 @@ interface NodeCardProps {
 }
 
 export function NodeCard({ node, onEdit, onDelete, onAddChild, dragHandleProps, highlighted, readOnly, compact }: NodeCardProps) {
-  const style = ROLE_STYLES[node.roleType];
+  const style = getDepartmentStyle(node.department);
   const textStyle: React.CSSProperties | undefined = node.textColor ? { color: node.textColor } : undefined;
   const mutedTextStyle: React.CSSProperties | undefined = node.textColor ? { color: node.textColor, opacity: 0.75 } : undefined;
   const cardStyle: React.CSSProperties = {

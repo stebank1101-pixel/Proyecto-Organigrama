@@ -1,4 +1,6 @@
 import { forwardRef, useMemo } from "react";
+import { getDepartmentStyle } from "../lib/departmentColors";
+import { OrgIcon } from "../lib/icons";
 import type { OrgNode } from "../types";
 import { NodeCard } from "./NodeCard";
 
@@ -55,15 +57,22 @@ function VerticalBranch({
 }
 
 // A root's direct children (departments) form the horizontal spine row; everything
-// each one leads to renders as a vertical branch column beneath it.
+// each one leads to renders as a vertical branch column beneath it. The colored bar
+// labels the whole branch by department, echoing the reference org chart where each
+// division gets its own color instead of coloring by seniority.
 function SpineColumn({
   node,
   childrenByParent,
   ...handlers
 }: { node: OrgNode; childrenByParent: Map<string, OrgNode[]> } & TreeHandlers) {
   const children = childrenByParent.get(node.id) || [];
+  const deptStyle = getDepartmentStyle(node.department);
   return (
     <li className="org-spine-item">
+      <div className={`mb-2 flex w-[240px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm ${deptStyle.header}`}>
+        <OrgIcon name={node.iconName} className="h-3.5 w-3.5 flex-shrink-0" />
+        <span className="truncate">{node.department || node.title}</span>
+      </div>
       <Card node={node} {...handlers} />
       {children.length > 0 && (
         <ul className="org-vbranch-list">
