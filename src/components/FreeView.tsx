@@ -7,6 +7,21 @@ const CARD_H_FULL = 188;
 const CARD_H_COMPACT = 92;
 const PADDING = 260;
 
+// Point where a ray from a card's center toward another point exits that card's
+// rectangle — used so a coordination line (and its control icons) stops at the card's
+// edge instead of cutting through it, which would hide the icons under the card next to it.
+function clipToRectEdge(cx: number, cy: number, towardX: number, towardY: number, w: number, h: number): { x: number; y: number } {
+  const dx = towardX - cx;
+  const dy = towardY - cy;
+  if (dx === 0 && dy === 0) return { x: cx, y: cy };
+  const halfW = w / 2;
+  const halfH = h / 2;
+  const tx = dx !== 0 ? halfW / Math.abs(dx) : Infinity;
+  const ty = dy !== 0 ? halfH / Math.abs(dy) : Infinity;
+  const t = Math.min(tx, ty);
+  return { x: cx + dx * t, y: cy + dy * t };
+}
+
 // Every descendant of `nodeId` is an invalid reparent target — dropping a node onto
 // its own descendant would create a cycle in the reporting chain.
 function getDescendantIds(nodeId: string, nodes: OrgNode[]): Set<string> {
@@ -36,6 +51,7 @@ interface FreeViewProps {
   onLineDelete?: (id: string) => void;
   onCoordinationLink?: (id: string, targetId: string) => void;
   onCoordinationStyleToggle?: (id: string, targetId: string) => void;
+  onCoordinationLineAdjust?: (id: string, targetId: string, offsetX: number, offsetY: number) => void;
   onCoordinationUnlink?: (id: string, targetId: string) => void;
   highlightedId?: string | null;
   readOnly?: boolean;
@@ -58,6 +74,7 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
     onLineDelete,
     onCoordinationLink,
     onCoordinationStyleToggle,
+    onCoordinationLineAdjust,
     onCoordinationUnlink,
     highlightedId,
     readOnly,
@@ -71,6 +88,8 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
   // start; each move re-derives a fresh offset-from-default since the connected cards'
   // live positions (and therefore the natural midpoint) can shift frame to frame.
   const lineDragState = useRef<{ id: string; grabOffsetX: number; grabOffsetY: number } | null>(null);
+  // Same idea as lineDragState, but for bending an existing coordination line.
+  const coordLineDragState = useRef<{ id: string; targetId: string; grabOffsetX: number; grabOffsetY: number } | null>(null);
   // Shift+drag (or Conectar líneas mode) from a card draws a dotted coordination line to
   // whatever card it's released on, instead of moving the card.
   const linkDragState = useRef<{ id: string } | null>(null);
@@ -134,6 +153,27 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
     return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
   }
 
+  // Same idea as getDefaultMid, but edge-to-edge (via clipToRectEdge) since a coordination
+  // line can run between any two cards, not just a vertically-stacked parent/child pair.
+  function getCoordDefaultMid(node: OrgNode, target: OrgNode): { x: number; y: number } {
+    const cx1 = node.freeX + CARD_W / 2;
+    const cy1 = node.freeY + CARD_H / 2;
+    const cx2 = target.freeX + CARD_W / 2;
+    const cy2 = target.freeY + CARD_H / 2;
+    const p1 = clipToRectEdge(cx1, cy1, cx2, cy2, CARD_W, CARD_H);
+    const p2 = clipToRectEdge(cx2, cy2, cx1, cy1, CARD_W, CARD_H);
+    return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+  }
+
+  function handleCoordLinePointerDown(e: React.PointerEvent, nodeId: string, targetId: string, midX: number, midY: number) {
+    if (readOnly) return;
+    e.preventDefault();
+    e.stopPropagation();
+    document.body.style.userSelect = "none";
+    coordLineDragState.current = { id: nodeId, targetId, grabOffsetX: e.clientX - midX, grabOffsetY: e.clientY - midY };
+    (e.target as SVGElement).setPointerCapture(e.pointerId);
+  }
+
   function handleLinePointerDown(e: React.PointerEvent, nodeId: string, midX: number, midY: number) {
     if (readOnly) return;
     e.preventDefault();
@@ -171,6 +211,24 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
         }
       }
       setLinkHoverId(hovered);
+      return;
+    }
+
+    const coordDrag = coordLineDragState.current;
+    if (coordDrag) {
+      const node = nodesById.get(coordDrag.id);
+      const target = nodesById.get(coordDrag.targetId);
+      if (node && target) {
+        const defaultMid = getCoordDefaultMid(node, target);
+        const absMidX = e.clientX - coordDrag.grabOffsetX;
+        const absMidY = e.clientY - coordDrag.grabOffsetY;
+        const link = (node.coordinationLinks || []).find((l) => l.targetId === coordDrag.targetId);
+        if (link) {
+          link.offsetX = absMidX - defaultMid.x;
+          link.offsetY = absMidY - defaultMid.y;
+          forceRerender((v) => v + 1);
+        }
+      }
       return;
     }
 
@@ -222,6 +280,18 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
       setLinkHoverId(null);
       setLinkPreviewPos(null);
       document.body.style.userSelect = "";
+      return;
+    }
+
+    if (coordLineDragState.current) {
+      const drag = coordLineDragState.current;
+      const node = nodesById.get(drag.id);
+      const link = node?.coordinationLinks?.find((l) => l.targetId === drag.targetId);
+      if (link && link.offsetX !== undefined && link.offsetY !== undefined) {
+        onCoordinationLineAdjust?.(drag.id, drag.targetId, link.offsetX, link.offsetY);
+      }
+      document.body.style.userSelect = "";
+      coordLineDragState.current = null;
       return;
     }
 
@@ -319,27 +389,44 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
           (node.coordinationLinks || []).map((link) => {
             const target = nodesById.get(link.targetId);
             if (!target) return null;
-            const x1 = node.freeX + CARD_W / 2;
-            const y1 = node.freeY + CARD_H / 2;
-            const x2 = target.freeX + CARD_W / 2;
-            const y2 = target.freeY + CARD_H / 2;
-            const midX = (x1 + x2) / 2;
-            const midY = (y1 + y2) / 2;
+            const cx1 = node.freeX + CARD_W / 2;
+            const cy1 = node.freeY + CARD_H / 2;
+            const cx2 = target.freeX + CARD_W / 2;
+            const cy2 = target.freeY + CARD_H / 2;
+            // Stop each end at its card's edge (not center) so close-together cards never
+            // bury the line — or its control icons — underneath the neighboring card.
+            const p1 = clipToRectEdge(cx1, cy1, cx2, cy2, CARD_W, CARD_H);
+            const p2 = clipToRectEdge(cx2, cy2, cx1, cy1, CARD_W, CARD_H);
+            const x1 = p1.x;
+            const y1 = p1.y;
+            const x2 = p2.x;
+            const y2 = p2.y;
+            const midX = (x1 + x2) / 2 + (link.offsetX ?? 0);
+            const midY = (y1 + y2) / 2 + (link.offsetY ?? 0);
             return (
               <g key={`${node.id}->${link.targetId}`}>
-                <line
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
+                <path
+                  d={`M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`}
+                  fill="none"
                   stroke="rgba(100,116,139,0.55)"
                   strokeWidth={1.5}
                   strokeDasharray={link.style === "dashed" ? "6 4" : undefined}
                 />
                 {!readOnly && (
                   <>
+                    <circle
+                      cx={midX}
+                      cy={midY}
+                      r={7}
+                      className="fill-white stroke-sky-400 hover:fill-sky-100"
+                      strokeWidth={2}
+                      style={{ pointerEvents: "auto", cursor: "grab", touchAction: "none" }}
+                      onPointerDown={(e) => handleCoordLinePointerDown(e, node.id, link.targetId, midX, midY)}
+                    >
+                      <title>Arrastra para curvar esta línea de coordinación</title>
+                    </circle>
                     <g
-                      transform={`translate(${midX - 18}, ${midY})`}
+                      transform={`translate(${midX - 20}, ${midY - 20})`}
                       style={{ pointerEvents: "auto", cursor: "pointer" }}
                       onClick={() => onCoordinationStyleToggle?.(node.id, link.targetId)}
                     >
@@ -356,7 +443,7 @@ export const FreeView = forwardRef<HTMLDivElement, FreeViewProps>(function FreeV
                       <title>{link.style === "dashed" ? "Cambiar a línea continua" : "Cambiar a línea punteada"}</title>
                     </g>
                     <g
-                      transform={`translate(${midX + 18}, ${midY})`}
+                      transform={`translate(${midX + 20}, ${midY - 20})`}
                       style={{ pointerEvents: "auto", cursor: "pointer" }}
                       onClick={() => onCoordinationUnlink?.(node.id, link.targetId)}
                     >

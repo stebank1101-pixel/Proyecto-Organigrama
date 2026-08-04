@@ -147,6 +147,19 @@ export default function App() {
     setDirty(true);
   }
 
+  function handleCoordinationLineAdjust(id: string, targetId: string, offsetX: number, offsetY: number) {
+    setNodes((prev) =>
+      prev.map((n) => {
+        if (n.id !== id) return n;
+        return {
+          ...n,
+          coordinationLinks: (n.coordinationLinks || []).map((link) => (link.targetId === targetId ? { ...link, offsetX, offsetY } : link)),
+        };
+      })
+    );
+    setDirty(true);
+  }
+
   function handleCoordinationUnlink(id: string, targetId: string) {
     setNodes((prev) =>
       prev.map((n) =>
@@ -304,6 +317,7 @@ export default function App() {
             onLineDelete={handleLineDelete}
             onCoordinationLink={handleCoordinationLink}
             onCoordinationStyleToggle={handleCoordinationStyleToggle}
+            onCoordinationLineAdjust={handleCoordinationLineAdjust}
             onCoordinationUnlink={handleCoordinationUnlink}
             onSave={handleSave}
             onCreateWorkCenter={handleCreateWorkCenter}

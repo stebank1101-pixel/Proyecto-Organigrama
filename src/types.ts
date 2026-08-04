@@ -52,8 +52,9 @@ export interface OrgNode {
   lineOffsetY?: number;
   /** Other nodes this one has a "functional coordination" line to — independent of the
    * parentId hierarchy (a node can have several of these). Each link picks its own
-   * solid/dashed style, same convention as the reference org chart's line legend. */
-  coordinationLinks?: { targetId: string; style: "solid" | "dashed" }[];
+   * solid/dashed style (same convention as the reference org chart's line legend) and can
+   * be bent the same way as the hierarchy line — offsetX/Y from the automatic midpoint. */
+  coordinationLinks?: { targetId: string; style: "solid" | "dashed"; offsetX?: number; offsetY?: number }[];
 }
 
 export interface FontOption {

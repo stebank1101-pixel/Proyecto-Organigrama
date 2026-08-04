@@ -44,6 +44,7 @@ interface OrgChartViewProps {
   onLineDelete: (id: string) => void;
   onCoordinationLink: (id: string, targetId: string) => void;
   onCoordinationStyleToggle: (id: string, targetId: string) => void;
+  onCoordinationLineAdjust: (id: string, targetId: string, offsetX: number, offsetY: number) => void;
   onCoordinationUnlink: (id: string, targetId: string) => void;
   onSave: () => void;
   onCreateWorkCenter: (name: string) => Promise<boolean>;
@@ -96,6 +97,7 @@ export function OrgChartView({
   onLineDelete,
   onCoordinationLink,
   onCoordinationStyleToggle,
+  onCoordinationLineAdjust,
   onCoordinationUnlink,
   onSave,
   onCreateWorkCenter,
@@ -472,6 +474,7 @@ export function OrgChartView({
                   onLineDelete={readOnly ? undefined : onLineDelete}
                   onCoordinationLink={readOnly ? undefined : onCoordinationLink}
                   onCoordinationStyleToggle={readOnly ? undefined : onCoordinationStyleToggle}
+                  onCoordinationLineAdjust={readOnly ? undefined : onCoordinationLineAdjust}
                   onCoordinationUnlink={readOnly ? undefined : onCoordinationUnlink}
                   readOnly={readOnly}
                   compact={compact}
