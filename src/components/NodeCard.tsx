@@ -1,14 +1,7 @@
-import { Mail, Pencil, Phone, Plus, Trash2, Users2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { getDepartmentStyle } from "../lib/departmentColors";
 import { OrgIcon } from "../lib/icons";
 import type { OrgNode } from "../types";
-
-const ROLE_LABEL: Record<OrgNode["roleType"], string> = {
-  executive: "Ejecutivo",
-  director: "Director",
-  manager: "Manager",
-  employee: "Colaborador",
-};
 
 interface NodeCardProps {
   node: OrgNode;
@@ -58,78 +51,19 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, dragHandleProps, 
         title={node.status === "active" ? "Activo" : "Inactivo"}
       />
 
-      <div className="flex items-start gap-2.5 pt-1">
-        {!compact && (
-          <img
-            src={node.avatar || "https://api.dicebear.com/9.x/initials/svg?seed=" + encodeURIComponent(node.title || "?")}
-            alt={node.name || node.title}
-            className="h-11 w-11 flex-shrink-0 rounded-full border border-slate-200 object-cover"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).src = "https://api.dicebear.com/9.x/initials/svg?seed=" + encodeURIComponent(node.name || node.title || "?");
-            }}
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-900" style={textStyle} title={node.title}>
-            {node.title || "Cargo sin definir"}
-          </p>
-          <p className="truncate text-xs text-slate-500" style={mutedTextStyle} title={compact ? node.department : node.name || "Vacante"}>
-            {compact ? node.department || "Área sin asignar" : node.name || "Vacante"}
-          </p>
-        </div>
+      <div className="pt-1">
+        <p className="truncate text-sm font-semibold text-slate-900" style={textStyle} title={node.title}>
+          {node.title || "Cargo sin definir"}
+        </p>
+        <p className="truncate text-xs text-slate-500" style={mutedTextStyle} title={compact ? node.department : node.name || "Vacante"}>
+          {compact ? node.department || "Área sin asignar" : node.name || "Vacante"}
+        </p>
       </div>
 
-      {!compact && node.assignees && node.assignees.length > 0 && (
-        <div className="mt-2 flex items-center gap-1" title={node.assignees.map((a) => a.name).filter(Boolean).join(", ")}>
-          <div className="flex -space-x-2">
-            {node.assignees.slice(0, 4).map((a) => (
-              <img
-                key={a.id}
-                src={a.avatar || "https://api.dicebear.com/9.x/initials/svg?seed=" + encodeURIComponent(a.name || "?")}
-                alt={a.name}
-                className="h-5 w-5 rounded-full border-2 border-white object-cover"
-              />
-            ))}
-          </div>
-          <span className="text-[10px] text-slate-400" style={mutedTextStyle}>
-            {node.assignees.length} {node.assignees.length === 1 ? "persona asignada" : "personas asignadas"}
-          </span>
-        </div>
-      )}
-
       {!compact && (
-        <div className="mt-2 flex flex-wrap items-center gap-1">
-          <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${style.badge}`}>{ROLE_LABEL[node.roleType]}</span>
-          {node.customBadge && (
-            <span className="truncate rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-500">
-              {node.customBadge}
-            </span>
-          )}
-        </div>
-      )}
-
-      {!compact && (
-        <div className="mt-2 space-y-0.5 text-[11px] text-slate-500" style={mutedTextStyle}>
-          <p className="truncate">{node.department} · {node.sede}</p>
-          <p className="flex items-center gap-1 truncate">
-            <Mail className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{node.email}</span>
-          </p>
-          <p className="flex items-center gap-1">
-            <Phone className="h-3 w-3 flex-shrink-0" />
-            {node.phone}
-          </p>
-        </div>
-      )}
-
-      {!compact && (
-        <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-600" style={mutedTextStyle}>
-          <span className="flex items-center gap-1">
-            <Users2 className="h-3 w-3" />
-            {node.metrics?.headcount ?? 0}
-          </span>
-          <span>{node.metrics?.budget}</span>
-        </div>
+        <p className="mt-2 truncate text-[11px] text-slate-500" style={mutedTextStyle} title={`${node.department} · ${node.sede}`}>
+          {node.department} · {node.sede}
+        </p>
       )}
 
       {!readOnly && (
