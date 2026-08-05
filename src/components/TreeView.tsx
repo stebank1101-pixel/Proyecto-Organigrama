@@ -71,6 +71,11 @@ interface TreeViewProps {
   logo?: string;
   canvasBackgroundColor?: string;
   canvasBackgroundImage?: string;
+  /** Visual scale of the canvas (1 = 100%). Applied as a CSS transform on the root, so every
+   * pointer handler below converts screen coordinates through `clientToCanvas` before mixing
+   * them with logical units (freeX/freeY/CARD_W/H) — otherwise dragging at any zoom other
+   * than 100% would drift away from the cursor. */
+  zoom?: number;
 }
 
 export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeView(
@@ -97,6 +102,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     logo,
     canvasBackgroundColor,
     canvasBackgroundImage,
+    zoom = 1,
   },
   forwardedRef
 ) {
@@ -206,6 +212,16 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     else if (forwardedRef) (forwardedRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
   }
 
+  // Every pointer handler below needs canvas-local (logical) coordinates, but the browser
+  // only ever gives screen coordinates — and the root is visually scaled by `zoom` via CSS
+  // transform, so screen and logical pixels only match 1:1 at 100%. This is the single
+  // conversion point; mixing raw e.clientX/Y with freeX/freeY anywhere else would drift.
+  function clientToCanvas(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return { x: clientX, y: clientY };
+    return { x: (clientX - rect.left) / zoom, y: (clientY - rect.top) / zoom };
+  }
+
   function handlePointerDown(e: React.PointerEvent, node: OrgNode) {
     const target = e.target as HTMLElement;
     if (target.closest("button")) return;
@@ -228,10 +244,11 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
       return;
     }
 
+    const startPoint = clientToCanvas(e.clientX, e.clientY);
     dragState.current = {
       id: node.id,
-      offsetX: e.clientX - node.freeX,
-      offsetY: e.clientY - node.freeY,
+      offsetX: startPoint.x - node.freeX,
+      offsetY: startPoint.y - node.freeY,
       blockedIds: getDescendantIds(node.id, nodes),
     };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -279,10 +296,11 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     e.preventDefault();
     e.stopPropagation();
     document.body.style.userSelect = "none";
+    const p = clientToCanvas(e.clientX, e.clientY);
     lineDragState.current = {
       id: nodeId,
-      grabOffsetX: e.clientX - midX,
-      grabOffsetY: e.clientY - midY,
+      grabOffsetX: p.x - midX,
+      grabOffsetY: p.y - midY,
       startX: e.clientX,
       startY: e.clientY,
       moved: false,
@@ -307,11 +325,12 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     e.preventDefault();
     e.stopPropagation();
     document.body.style.userSelect = "none";
+    const p = clientToCanvas(e.clientX, e.clientY);
     coordLineDragState.current = {
       id: nodeId,
       targetId,
-      grabOffsetX: e.clientX - midX,
-      grabOffsetY: e.clientY - midY,
+      grabOffsetX: p.x - midX,
+      grabOffsetY: p.y - midY,
       startX: e.clientX,
       startY: e.clientY,
       moved: false,
@@ -323,15 +342,12 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     dragCursorPos.current = { x: e.clientX, y: e.clientY };
 
     if (linkDragState.current) {
-      const rect = rootRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const localX = e.clientX - rect.left;
-      const localY = e.clientY - rect.top;
-      setLinkPreviewPos({ x: localX, y: localY });
+      const p = clientToCanvas(e.clientX, e.clientY);
+      setLinkPreviewPos({ x: p.x, y: p.y });
       let hovered: string | null = null;
       for (const other of nodes) {
         if (other.id === linkDragState.current.id) continue;
-        if (localX >= other.freeX && localX <= other.freeX + CARD_W && localY >= other.freeY && localY <= other.freeY + CARD_H) {
+        if (p.x >= other.freeX && p.x <= other.freeX + CARD_W && p.y >= other.freeY && p.y <= other.freeY + CARD_H) {
           hovered = other.id;
           break;
         }
@@ -350,8 +366,9 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
         const defaultMid = getCoordDefaultMid(node, target);
         const link = (node.coordinationLinks || []).find((l) => l.targetId === coordDrag.targetId);
         if (link) {
-          link.offsetX = e.clientX - coordDrag.grabOffsetX - defaultMid.x;
-          link.offsetY = e.clientY - coordDrag.grabOffsetY - defaultMid.y;
+          const p = clientToCanvas(e.clientX, e.clientY);
+          link.offsetX = p.x - coordDrag.grabOffsetX - defaultMid.x;
+          link.offsetY = p.y - coordDrag.grabOffsetY - defaultMid.y;
           forceRerender((v) => v + 1);
         }
       }
@@ -365,8 +382,9 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
       const node = nodesById.get(lineDrag.id);
       const defaultMid = node ? getDefaultMid(node) : null;
       if (node && defaultMid) {
-        const absMidX = e.clientX - lineDrag.grabOffsetX;
-        const absMidY = e.clientY - lineDrag.grabOffsetY;
+        const p = clientToCanvas(e.clientX, e.clientY);
+        const absMidX = p.x - lineDrag.grabOffsetX;
+        const absMidY = p.y - lineDrag.grabOffsetY;
         node.lineOffsetX = absMidX - defaultMid.x;
         node.lineOffsetY = absMidY - defaultMid.y;
         forceRerender((v) => v + 1);
@@ -378,8 +396,9 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     if (!drag) return;
     const node = nodesById.get(drag.id);
     if (!node) return;
-    const nextX = Math.max(0, e.clientX - drag.offsetX);
-    const nextY = Math.max(0, e.clientY - drag.offsetY);
+    const p = clientToCanvas(e.clientX, e.clientY);
+    const nextX = Math.max(0, p.x - drag.offsetX);
+    const nextY = Math.max(0, p.y - drag.offsetY);
     node.freeX = nextX;
     node.freeY = nextY;
 
@@ -475,19 +494,25 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
   }
 
   return (
-    <div
-      ref={setRootRef}
-      className="relative"
-      style={{
-        width: bounds.width,
-        height: bounds.height,
-        ...(canvasBackgroundColor ? { backgroundColor: canvasBackgroundColor } : {}),
-        ...(canvasBackgroundImage ? { backgroundImage: `url(${canvasBackgroundImage})`, backgroundRepeat: "repeat" } : {}),
-      }}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
-    >
+    // Outer box reserves the VISUALLY scaled size for the scroll container — a CSS
+    // transform alone doesn't affect layout, so without this the scrollable area would
+    // stay sized to the unscaled canvas regardless of zoom (either clipping it when zoomed
+    // in, or leaving a huge dead scroll margin when zoomed out).
+    <div style={{ width: bounds.width * zoom, height: bounds.height * zoom }}>
+      <div
+        ref={setRootRef}
+        className="relative origin-top-left"
+        style={{
+          width: bounds.width,
+          height: bounds.height,
+          transform: `scale(${zoom})`,
+          ...(canvasBackgroundColor ? { backgroundColor: canvasBackgroundColor } : {}),
+          ...(canvasBackgroundImage ? { backgroundImage: `url(${canvasBackgroundImage})`, backgroundRepeat: "repeat" } : {}),
+        }}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+      >
       {logo && <img src={logo} alt="" className="pointer-events-none absolute left-6 top-6 max-h-16 max-w-[200px] object-contain" />}
       <svg className="pointer-events-none absolute inset-0" width={bounds.width} height={bounds.height}>
         {nodes.map((node) => {
@@ -522,7 +547,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
                 key={`${node.id}->${link.targetId}`}
                 d={`M ${p1.x} ${p1.y} Q ${midX} ${midY} ${p2.x} ${p2.y}`}
                 fill="none"
-                stroke="rgba(168,85,247,0.7)"
+                stroke="rgba(100,116,139,0.35)"
                 strokeWidth={2}
                 strokeDasharray={link.style === "dashed" ? "6 4" : undefined}
               />
@@ -544,7 +569,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
                 y1={y1}
                 x2={linkPreviewPos.x}
                 y2={linkPreviewPos.y}
-                stroke="rgba(168,85,247,0.6)"
+                stroke="rgba(100,116,139,0.5)"
                 strokeWidth={2}
                 strokeDasharray="6 4"
               />
@@ -701,6 +726,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
           )}
         </svg>
       )}
+      </div>
     </div>
   );
 });

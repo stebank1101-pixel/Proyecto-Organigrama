@@ -1,6 +1,6 @@
 import { toPng, toSvg } from "html-to-image";
 import { jsPDF } from "jspdf";
-import { ArrowLeft, Building2, Download, FileImage, FileText, IdCard, Link2, Plus, Save, Search, Settings } from "lucide-react";
+import { ArrowLeft, Building2, Download, FileImage, FileText, IdCard, Link2, Minus, Plus, Save, Search, Settings } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../lib/i18n";
 import { computeAllSedes, computeWorkCenterRows, type CenterSelection } from "../lib/workCenters";
@@ -15,6 +15,13 @@ import { WorkCenterPicker } from "./WorkCenterPicker";
 // Extra empty margin around the chart so there's always room to drag-pan in every
 // direction, even when the chart itself is smaller than the viewport.
 const PAN_PADDING = 400;
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 2;
+const ZOOM_STEP = 0.1;
+
+function clampZoom(z: number): number {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100));
+}
 
 interface OrgChartViewProps {
   nodes: OrgNode[];
@@ -124,6 +131,7 @@ export function OrgChartView({
   const [exporting, setExporting] = useState(false);
   const [manageCentersOpen, setManageCentersOpen] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const panState = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
@@ -148,6 +156,7 @@ export function OrgChartView({
     container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
     container.scrollTop = Math.max(0, PAN_PADDING - 24);
     setLinkMode(false);
+    setZoom(1);
   }, [selectedCenter, deptFilter, search]);
 
   useEffect(() => {
@@ -184,6 +193,43 @@ export function OrgChartView({
     document.body.style.userSelect = "none";
     panState.current = { startX: e.clientX, startY: e.clientY, scrollLeft: container.scrollLeft, scrollTop: container.scrollTop };
     setIsPanning(true);
+  }
+
+  function zoomIn() {
+    setZoom((z) => clampZoom(z + ZOOM_STEP));
+  }
+
+  function zoomOut() {
+    setZoom((z) => clampZoom(z - ZOOM_STEP));
+  }
+
+  function resetZoom() {
+    setZoom(1);
+  }
+
+  // Ctrl/Cmd+wheel zooms instead of scrolling — centered on the cursor, so whatever's under
+  // it stays put rather than the canvas visibly jumping. Plain wheel still scrolls normally.
+  function handleWheel(e: React.WheelEvent) {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    const container = scrollRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const cursorX = e.clientX - rect.left;
+    const cursorY = e.clientY - rect.top;
+    const contentX = container.scrollLeft + cursorX;
+    const contentY = container.scrollTop + cursorY;
+    const prevZoom = zoom;
+    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    const nextZoom = clampZoom(prevZoom * factor);
+    if (nextZoom === prevZoom) return;
+    setZoom(nextZoom);
+    requestAnimationFrame(() => {
+      const c = scrollRef.current;
+      if (!c) return;
+      c.scrollLeft = contentX * (nextZoom / prevZoom) - cursorX;
+      c.scrollTop = contentY * (nextZoom / prevZoom) - cursorY;
+    });
   }
 
   const allSedes = useMemo(() => computeAllSedes(nodes, workCenters), [nodes, workCenters]);
@@ -362,6 +408,23 @@ export function OrgChartView({
               >
                 <IdCard className="h-3.5 w-3.5" /> {compact ? t.orgChart.compactView : t.orgChart.detailedView}
               </button>
+              {activeCenter && (
+                <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                  <button onClick={zoomOut} disabled={zoom <= MIN_ZOOM} className="icon-btn" title={t.orgChart.zoomOut}>
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={resetZoom}
+                    className="min-w-[3.25rem] rounded-md px-1.5 py-1 text-center text-[11px] font-medium text-slate-600 hover:bg-slate-200"
+                    title={t.orgChart.zoomReset}
+                  >
+                    {Math.round(zoom * 100)}%
+                  </button>
+                  <button onClick={zoomIn} disabled={zoom >= MAX_ZOOM} className="icon-btn" title={t.orgChart.zoomIn}>
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
               <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
                 <button disabled={exporting} onClick={() => exportAs("png")} className="icon-btn" title={t.orgChart.exportPng}>
                   <FileImage className="h-3.5 w-3.5" />
@@ -428,6 +491,7 @@ export function OrgChartView({
           <div
             ref={scrollRef}
             onMouseDown={handleCanvasMouseDown}
+            onWheel={activeCenter ? handleWheel : undefined}
             className={`min-h-0 flex-1 overflow-auto bg-white bg-[radial-gradient(circle_at_1px_1px,rgba(100,116,139,0.18)_1px,transparent_0)] bg-[length:22px_22px] ${
               isPanning ? "cursor-grabbing select-none" : "cursor-grab"
             }`}
@@ -452,6 +516,7 @@ export function OrgChartView({
                   onRemoveBoss={readOnly ? undefined : (node) => onLineDelete(node.id)}
                   onNodeMove={onMoveNode}
                   onNavigateToSede={handleNavigateToSede}
+                  zoom={zoom}
                   logo={activeCenterProfile?.logo}
                   canvasBackgroundColor={activeCenterProfile?.backgroundColor}
                   canvasBackgroundImage={activeCenterProfile?.backgroundImage}
