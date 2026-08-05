@@ -2,6 +2,7 @@ import { toPng, toSvg } from "html-to-image";
 import { jsPDF } from "jspdf";
 import { ArrowLeft, Building2, Download, FileImage, FileText, IdCard, Link2, Plus, Save, Search, Settings } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useT } from "../lib/i18n";
 import { computeAllSedes, computeWorkCenterRows, type CenterSelection } from "../lib/workCenters";
 import type { OrgNode, WorkCenter } from "../types";
 import { AllCentersOverview } from "./AllCentersOverview";
@@ -93,6 +94,7 @@ export function OrgChartView({
   dirty,
   readOnly,
 }: OrgChartViewProps) {
+  const t = useT();
   const [selectedCenter, setSelectedCenter] = useState<CenterSelection>(null);
   // Compact shows only area + cargo per box; detailed reveals the rest of the node's
   // data (contact info, badges, metrics) for whoever needs it later. Remembered per browser.
@@ -280,7 +282,7 @@ export function OrgChartView({
             <button
               onClick={() => setSelectedCenter(null)}
               className="icon-btn border border-slate-200"
-              title="Volver a centros de trabajo"
+              title={t.orgChart.backToCenters}
             >
               <ArrowLeft className="h-3.5 w-3.5" />
             </button>
@@ -291,9 +293,9 @@ export function OrgChartView({
                 className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
                   linkMode ? "border-purple-300 bg-purple-50 text-purple-700" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
                 }`}
-                title={linkMode ? "Arrastra entre dos tarjetas para crear una línea de coordinación" : "Activar para conectar tarjetas con una línea punteada"}
+                title={linkMode ? t.orgChart.connectLinesHintActive : t.orgChart.connectLinesHintInactive}
               >
-                <Link2 className="h-3.5 w-3.5" /> {linkMode ? "Conectando..." : "Conectar líneas"}
+                <Link2 className="h-3.5 w-3.5" /> {linkMode ? t.orgChart.connecting : t.orgChart.connectLines}
               </button>
             )}
 
@@ -303,7 +305,7 @@ export function OrgChartView({
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar por nombre o cargo..."
+                  placeholder={t.orgChart.searchPlaceholder}
                   className="w-56 rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2 text-xs text-slate-700 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
                 />
               </div>
@@ -311,7 +313,7 @@ export function OrgChartView({
 
             {activeCenter && (
               <select className="select-sm" value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
-                <option value="all">Todos los departamentos</option>
+                <option value="all">{t.orgChart.allDepartments}</option>
                 {departments.map((d) => (
                   <option key={d} value={d}>
                     {d}
@@ -323,7 +325,7 @@ export function OrgChartView({
             <div className="ml-auto flex flex-wrap items-center gap-2">
               {activeCenter && !readOnly && (
                 <button onClick={() => openCreate(null)} className="btn-secondary">
-                  <Plus className="h-3.5 w-3.5" /> Nuevo nodo
+                  <Plus className="h-3.5 w-3.5" /> {t.orgChart.newNode}
                 </button>
               )}
               <button
@@ -331,24 +333,24 @@ export function OrgChartView({
                 className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
                   compact ? "border-sky-200 bg-sky-50 text-sky-700" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
                 }`}
-                title={compact ? "Mostrando solo área y cargo" : "Mostrando toda la información del cargo"}
+                title={compact ? t.orgChart.compactHint : t.orgChart.detailedHint}
               >
-                <IdCard className="h-3.5 w-3.5" /> {compact ? "Vista compacta" : "Vista detallada"}
+                <IdCard className="h-3.5 w-3.5" /> {compact ? t.orgChart.compactView : t.orgChart.detailedView}
               </button>
               <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                <button disabled={exporting} onClick={() => exportAs("png")} className="icon-btn" title="Exportar PNG">
+                <button disabled={exporting} onClick={() => exportAs("png")} className="icon-btn" title={t.orgChart.exportPng}>
                   <FileImage className="h-3.5 w-3.5" />
                 </button>
-                <button disabled={exporting} onClick={() => exportAs("svg")} className="icon-btn" title="Exportar SVG">
+                <button disabled={exporting} onClick={() => exportAs("svg")} className="icon-btn" title={t.orgChart.exportSvg}>
                   <Download className="h-3.5 w-3.5" />
                 </button>
-                <button disabled={exporting} onClick={() => exportAs("pdf")} className="icon-btn" title="Exportar PDF">
+                <button disabled={exporting} onClick={() => exportAs("pdf")} className="icon-btn" title={t.orgChart.exportPdf}>
                   <FileText className="h-3.5 w-3.5" />
                 </button>
               </div>
               {activeCenter && !readOnly && (
                 <button onClick={onSave} disabled={saving || !dirty} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">
-                  <Save className="h-3.5 w-3.5" /> {saving ? "Guardando..." : dirty ? "Guardar cambios" : "Sincronizado"}
+                  <Save className="h-3.5 w-3.5" /> {saving ? t.orgChart.saving : dirty ? t.orgChart.saveChanges : t.orgChart.synced}
                 </button>
               )}
             </div>
@@ -356,7 +358,7 @@ export function OrgChartView({
 
           <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-200 bg-slate-50 px-4 py-2">
             <span className="flex flex-shrink-0 items-center gap-1 text-[11px] font-medium text-slate-500">
-              <Building2 className="h-3.5 w-3.5" /> Centros de trabajo:
+              <Building2 className="h-3.5 w-3.5" /> {t.orgChart.workCentersLabel}
             </span>
             <button
               onClick={() => setSelectedCenter("ALL")}
@@ -366,7 +368,7 @@ export function OrgChartView({
                   : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
               }`}
             >
-              Todos
+              {t.orgChart.all}
             </button>
             {allSedes.map((s) => (
               <button
@@ -385,18 +387,16 @@ export function OrgChartView({
               <button
                 onClick={() => setManageCentersOpen(true)}
                 className="ml-auto flex flex-shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:border-sky-300"
-                title="Crear o modificar centros de trabajo"
+                title={t.orgChart.manageCentersHint}
               >
-                <Settings className="h-3 w-3" /> Gestionar
+                <Settings className="h-3 w-3" /> {t.orgChart.manage}
               </button>
             )}
           </div>
 
           {activeCenter && !readOnly && (
             <p className={`border-b px-4 py-1.5 text-[11px] ${linkMode ? "border-purple-200 bg-purple-50 text-purple-700" : "border-slate-200 bg-sky-50 text-sky-700"}`}>
-              {linkMode
-                ? "Modo conectar activo: arrastra de una tarjeta a otra para crear una línea punteada de coordinación. Vuelve a hacer clic en \"Conectando...\" para salir."
-                : "Arrastra cualquier tarjeta a donde quieras. Suéltala sobre otra para reasignar su jefe directo, usa el ícono de desvincular para quitarle el jefe, o el botón \"Conectar líneas\" para crear conexiones de coordinación."}
+              {linkMode ? t.orgChart.linkModeHintActive : t.orgChart.linkModeHintInactive}
             </p>
           )}
 
@@ -467,13 +467,9 @@ export function OrgChartView({
 
       <ConfirmDialog
         open={!!deleteTarget}
-        title="Eliminar cargo"
-        description={
-          deleteTarget
-            ? `¿Eliminar el cargo "${deleteTarget.title}"? Sus reportes directos se reasignarán automáticamente a su superior.`
-            : ""
-        }
-        confirmLabel="Eliminar"
+        title={t.orgChart.deleteNodeTitle}
+        description={deleteTarget ? t.orgChart.deleteNodeDescription(deleteTarget.title) : ""}
+        confirmLabel={t.orgChart.deleteConfirmLabel}
         danger
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}

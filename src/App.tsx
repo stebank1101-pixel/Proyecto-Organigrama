@@ -16,6 +16,7 @@ import {
   updateWorkCenterProfileApi,
 } from "./lib/api";
 import { useAuth } from "./lib/auth";
+import { useT } from "./lib/i18n";
 import type { OrgNode, TabId, WorkCenter } from "./types";
 
 interface Toast {
@@ -26,6 +27,7 @@ interface Toast {
 
 export default function App() {
   const { user, loading: authLoading, isAdmin, isGuest } = useAuth();
+  const t = useT();
   const [nodes, setNodes] = useState<OrgNode[]>([]);
   const [workCenters, setWorkCenters] = useState<WorkCenter[]>([]);
   const [centerError, setCenterError] = useState<string | null>(null);
@@ -51,7 +53,7 @@ export default function App() {
       setNodes(res.data);
       setDirty(false);
     } catch (err) {
-      if (!silent) setLoadError(err instanceof Error ? err.message : "No se pudo cargar el organigrama");
+      if (!silent) setLoadError(err instanceof Error ? err.message : t.app.loadOrgError);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -65,7 +67,7 @@ export default function App() {
     if (!user && !isGuest) return;
     fetchWorkCenters()
       .then((res) => setWorkCenters(res.data))
-      .catch((err) => setCenterError(err instanceof Error ? err.message : "No se pudieron cargar los centros de trabajo"));
+      .catch((err) => setCenterError(err instanceof Error ? err.message : t.app.loadCentersError));
   }, [user, isGuest]);
 
   useEffect(() => {
@@ -100,7 +102,7 @@ export default function App() {
   function handleReparentNode(id: string, newParentId: string) {
     setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId: newParentId } : n)));
     setDirty(true);
-    pushToast("Jefe directo reasignado");
+    pushToast(t.app.bossReassigned);
   }
 
   function handleLineAdjust(id: string, offsetX: number, offsetY: number) {
@@ -116,7 +118,7 @@ export default function App() {
   function handleLineDelete(id: string) {
     setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId: null, lineOffsetX: undefined, lineOffsetY: undefined } : n)));
     setDirty(true);
-    pushToast("Línea de jefe directo eliminada");
+    pushToast(t.app.lineDeleted);
   }
 
   function handleCoordinationLink(id: string, targetId: string) {
@@ -129,7 +131,7 @@ export default function App() {
       })
     );
     setDirty(true);
-    pushToast("Línea de coordinación agregada");
+    pushToast(t.app.coordLinkAdded);
   }
 
   function handleCoordinationStyleToggle(id: string, targetId: string) {
@@ -188,7 +190,7 @@ export default function App() {
     }
     setDirty(true);
     setActiveTab("chart");
-    pushToast(`Se aplicaron ${newNodes.length} nodos generados por IA en ${targetSede}`);
+    pushToast(t.app.aiNodesApplied(newNodes.length, targetSede));
   }
 
   async function handleSave() {
@@ -196,9 +198,9 @@ export default function App() {
     try {
       await bulkSyncNodes(nodes);
       setDirty(false);
-      pushToast("Organigrama sincronizado correctamente");
+      pushToast(t.app.orgSynced);
     } catch (err) {
-      pushToast(err instanceof Error ? err.message : "Error al guardar", "error");
+      pushToast(err instanceof Error ? err.message : t.app.saveError, "error");
     } finally {
       setSaving(false);
     }
@@ -206,7 +208,7 @@ export default function App() {
 
   async function handleHrSynced() {
     await loadNodes(true);
-    pushToast("Organigrama actualizado desde RRHH");
+    pushToast(t.app.hrSynced);
   }
 
   async function handleCreateWorkCenter(name: string): Promise<boolean> {
@@ -218,7 +220,7 @@ export default function App() {
       );
       return true;
     } catch (err) {
-      setCenterError(err instanceof Error ? err.message : "No se pudo crear el centro de trabajo");
+      setCenterError(err instanceof Error ? err.message : t.app.createCenterError);
       return false;
     }
   }
@@ -237,7 +239,7 @@ export default function App() {
       });
       return true;
     } catch (err) {
-      setCenterError(err instanceof Error ? err.message : "No se pudo renombrar el centro de trabajo");
+      setCenterError(err instanceof Error ? err.message : t.app.renameCenterError);
       return false;
     }
   }
@@ -252,7 +254,7 @@ export default function App() {
       setWorkCenters((prev) => prev.filter((c) => c.name !== name));
       return true;
     } catch (err) {
-      setCenterError(err instanceof Error ? err.message : "No se pudo eliminar el centro de trabajo");
+      setCenterError(err instanceof Error ? err.message : t.app.deleteCenterError);
       return false;
     }
   }
@@ -268,7 +270,7 @@ export default function App() {
       });
       return true;
     } catch (err) {
-      setCenterError(err instanceof Error ? err.message : "No se pudo actualizar el centro de trabajo");
+      setCenterError(err instanceof Error ? err.message : t.app.updateCenterError);
       return false;
     }
   }
@@ -276,7 +278,7 @@ export default function App() {
   if (authLoading) {
     return (
       <div className="flex h-screen items-center justify-center gap-2 bg-slate-50 text-slate-500">
-        <Loader2 className="h-5 w-5 animate-spin" /> Cargando sesión...
+        <Loader2 className="h-5 w-5 animate-spin" /> {t.app.loadingSession}
       </div>
     );
   }
@@ -292,14 +294,14 @@ export default function App() {
       <main className="min-h-0 flex-1">
         {loading ? (
           <div className="flex h-full items-center justify-center gap-2 text-slate-500">
-            <Loader2 className="h-5 w-5 animate-spin" /> Cargando organigrama...
+            <Loader2 className="h-5 w-5 animate-spin" /> {t.app.loadingChart}
           </div>
         ) : loadError ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-500">
             <AlertTriangle className="h-6 w-6 text-rose-500" />
             <p className="text-sm">{loadError}</p>
             <button className="btn-secondary" onClick={() => loadNodes()}>
-              Reintentar
+              {t.common.retry}
             </button>
           </div>
         ) : activeTab === "chart" ? (

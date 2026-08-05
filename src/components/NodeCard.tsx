@@ -1,5 +1,6 @@
 import { Pencil, Plus, Trash2, Unlink } from "lucide-react";
 import { getDepartmentStyle } from "../lib/departmentColors";
+import { useT } from "../lib/i18n";
 import { OrgIcon } from "../lib/icons";
 import type { OrgNode } from "../types";
 
@@ -18,6 +19,7 @@ interface NodeCardProps {
 }
 
 export function NodeCard({ node, onEdit, onDelete, onAddChild, onRemoveBoss, dragHandleProps, highlighted, readOnly, compact }: NodeCardProps) {
+  const t = useT();
   const style = getDepartmentStyle(node.department);
   const textStyle: React.CSSProperties | undefined = node.textColor ? { color: node.textColor } : undefined;
   const mutedTextStyle: React.CSSProperties | undefined = node.textColor ? { color: node.textColor, opacity: 0.75 } : undefined;
@@ -49,15 +51,15 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, onRemoveBoss, dra
 
       <span
         className={`absolute top-2 right-2 h-2 w-2 rounded-full ${node.status === "active" ? "bg-emerald-500" : "bg-slate-300"}`}
-        title={node.status === "active" ? "Activo" : "Inactivo"}
+        title={node.status === "active" ? t.nodeCard.active : t.nodeCard.inactive}
       />
 
       <div className="pt-1">
         <p className="truncate text-sm font-semibold text-slate-900" style={textStyle} title={node.title}>
-          {node.title || "Cargo sin definir"}
+          {node.title || t.nodeCard.untitledRole}
         </p>
         <p className="truncate text-xs text-slate-500" style={mutedTextStyle} title={compact ? node.department : node.name}>
-          {compact ? node.department || "Área sin asignar" : node.name}
+          {compact ? node.department || t.nodeCard.unassignedDepartment : node.name}
         </p>
       </div>
 
@@ -73,7 +75,7 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, onRemoveBoss, dra
             type="button"
             onClick={() => onAddChild(node)}
             className="rounded-full bg-white p-1.5 text-slate-500 shadow ring-1 ring-slate-200 hover:bg-slate-50 hover:text-slate-900"
-            title="Agregar subordinado"
+            title={t.nodeCard.addSubordinate}
           >
             <Plus className="h-3 w-3" />
           </button>
@@ -81,7 +83,7 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, onRemoveBoss, dra
             type="button"
             onClick={() => onEdit(node)}
             className="rounded-full bg-white p-1.5 text-slate-500 shadow ring-1 ring-slate-200 hover:bg-slate-50 hover:text-slate-900"
-            title="Editar"
+            title={t.nodeCard.edit}
           >
             <Pencil className="h-3 w-3" />
           </button>
@@ -90,7 +92,7 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, onRemoveBoss, dra
               type="button"
               onClick={() => onRemoveBoss(node)}
               className="rounded-full bg-white p-1.5 text-amber-600 shadow ring-1 ring-slate-200 hover:bg-amber-50"
-              title="Quitar jefe directo (deja al nodo sin jefe)"
+              title={t.nodeCard.removeBoss}
             >
               <Unlink className="h-3 w-3" />
             </button>
@@ -99,7 +101,7 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, onRemoveBoss, dra
             type="button"
             onClick={() => onDelete(node)}
             className="rounded-full bg-white p-1.5 text-rose-500 shadow ring-1 ring-slate-200 hover:bg-rose-50 hover:text-rose-600"
-            title="Eliminar"
+            title={t.nodeCard.delete}
           >
             <Trash2 className="h-3 w-3" />
           </button>

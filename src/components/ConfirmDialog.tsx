@@ -1,3 +1,5 @@
+import { useT } from "../lib/i18n";
+
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -8,7 +10,8 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-export function ConfirmDialog({ open, title, description, confirmLabel = "Confirmar", danger, onConfirm, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, title, description, confirmLabel, danger, onConfirm, onCancel }: ConfirmDialogProps) {
+  const t = useT();
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
@@ -17,13 +20,13 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
         <p className="mt-2 text-sm text-slate-500">{description}</p>
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onCancel} className="btn-secondary">
-            Cancelar
+            {t.confirmDialog.cancel}
           </button>
           <button
             onClick={onConfirm}
             className={danger ? "btn-primary bg-rose-600 hover:bg-rose-500" : "btn-primary"}
           >
-            {confirmLabel}
+            {confirmLabel ?? t.confirmDialog.confirm}
           </button>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { Building2 } from "lucide-react";
 import { forwardRef } from "react";
+import { useT } from "../lib/i18n";
 import { groupNodesBySede } from "../lib/workCenters";
 import type { OrgNode } from "../types";
 import { TreeView } from "./TreeView";
@@ -16,6 +17,7 @@ export const AllCentersOverview = forwardRef<HTMLDivElement, AllCentersOverviewP
   { nodes, allSedes, compact },
   ref
 ) {
+  const t = useT();
   const groups = groupNodesBySede(nodes, allSedes);
 
   return (
@@ -26,11 +28,11 @@ export const AllCentersOverview = forwardRef<HTMLDivElement, AllCentersOverviewP
             <Building2 className="h-4 w-4 text-slate-400" />
             {group.label}
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-              {group.nodes.length} {group.nodes.length === 1 ? "colaborador" : "colaboradores"}
+              {t.common.collaboratorCount(group.nodes.length)}
             </span>
           </div>
           {group.nodes.length === 0 ? (
-            <p className="text-xs text-slate-400">Sin colaboradores en este centro.</p>
+            <p className="text-xs text-slate-400">{t.allCenters.noCollaborators}</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-slate-100 bg-slate-50/50">
               <TreeView nodes={group.nodes} onEdit={noop} onDelete={noop} onAddChild={noop} onNodeMove={noop} readOnly compact={compact} />

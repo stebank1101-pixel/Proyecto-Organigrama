@@ -1,6 +1,7 @@
 import { KeyRound, Loader2, Plug, PlusCircle, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createApiKey, fetchApiKeys, fetchSyncLogs, triggerHrSync } from "../lib/api";
+import { useT } from "../lib/i18n";
 import { computeAllSedes } from "../lib/workCenters";
 import type { ApiKeyRecord, OrgNode, SyncLogRecord, WorkCenter } from "../types";
 
@@ -17,6 +18,7 @@ const SAMPLE_EMPLOYEES = [
 ];
 
 export function HrIntegrationView({ nodes, workCenters, onSynced, readOnly }: HrIntegrationViewProps) {
+  const t = useT();
   const [keys, setKeys] = useState<ApiKeyRecord[]>([]);
   const [logs, setLogs] = useState<SyncLogRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +51,7 @@ export function HrIntegrationView({ nodes, workCenters, onSynced, readOnly }: Hr
     if (!newKeyName.trim()) return;
     setCreating(true);
     try {
-      await createApiKey(newKeyName, newKeyProvider || "API Personalizada");
+      await createApiKey(newKeyName, newKeyProvider || t.hrIntegration.defaultProvider);
       setNewKeyName("");
       setNewKeyProvider("");
       await refresh();
@@ -68,7 +70,7 @@ export function HrIntegrationView({ nodes, workCenters, onSynced, readOnly }: Hr
       await refresh();
       onSynced();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Error al sincronizar");
+      setMessage(err instanceof Error ? err.message : t.hrIntegration.syncError);
     } finally {
       setSyncing(false);
     }
@@ -77,26 +79,24 @@ export function HrIntegrationView({ nodes, workCenters, onSynced, readOnly }: Hr
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col gap-6 overflow-y-auto p-6">
       {readOnly && (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-          Tu perfil es de solo lectura: puedes consultar claves y registros, pero solo un administrador puede sincronizar o crear claves.
-        </p>
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">{t.hrIntegration.readOnlyNotice}</p>
       )}
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-3 flex items-center gap-2">
           <Plug className="h-5 w-5 text-emerald-600" />
-          <h2 className="text-base font-semibold text-slate-900">Sincronización con sistemas de RRHH</h2>
+          <h2 className="text-base font-semibold text-slate-900">{t.hrIntegration.syncTitle}</h2>
         </div>
         <p className="mb-4 text-xs text-slate-500">
-          Endpoint: <code className="rounded bg-slate-100 px-1 py-0.5">POST /api/v1/hr/sync</code>. Simula la recepción de un webhook
-          desde Workday, Personio, BambooHR o Factorial.
+          {t.hrIntegration.endpointLabel} <code className="rounded bg-slate-100 px-1 py-0.5">POST /api/v1/hr/sync</code>.{" "}
+          {t.hrIntegration.endpointDescription}
         </p>
         {!readOnly && (
           <>
             <label className="mb-3 block text-xs font-medium text-slate-600">
-              Centro de trabajo destino
+              {t.hrIntegration.targetCenter}
               <select className="input mt-1" value={targetSede} onChange={(e) => setTargetSede(e.target.value)}>
-                <option value="">— Elige un centro —</option>
+                <option value="">{t.hrIntegration.chooseCenterOption}</option>
                 {allSedes.map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -107,10 +107,10 @@ export function HrIntegrationView({ nodes, workCenters, onSynced, readOnly }: Hr
             <div className="flex flex-wrap gap-2">
               <button className="btn-secondary" disabled={syncing || !targetSede} onClick={() => handleTestSync("append")}>
                 {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlusCircle className="h-3.5 w-3.5" />}
-                Agregar empleados de prueba
+                {t.hrIntegration.addTestEmployees}
               </button>
               <button className="btn-primary" disabled={syncing || !targetSede} onClick={() => handleTestSync("replace")}>
-                Reemplazar con datos de prueba
+                {t.hrIntegration.replaceTestData}
               </button>
             </div>
           </>
@@ -121,26 +121,26 @@ export function HrIntegrationView({ nodes, workCenters, onSynced, readOnly }: Hr
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-3 flex items-center gap-2">
           <KeyRound className="h-5 w-5 text-amber-600" />
-          <h2 className="text-base font-semibold text-slate-900">Claves de integración</h2>
+          <h2 className="text-base font-semibold text-slate-900">{t.hrIntegration.integrationKeysTitle}</h2>
         </div>
 
         {!readOnly && (
           <form onSubmit={handleCreateKey} className="mb-4 flex flex-wrap gap-2">
             <input
               className="input flex-1 min-w-[160px]"
-              placeholder="Nombre de la clave"
+              placeholder={t.hrIntegration.keyNamePlaceholder}
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
             />
             <input
               className="input flex-1 min-w-[160px]"
-              placeholder="Proveedor (ej: BambooHR)"
+              placeholder={t.hrIntegration.providerPlaceholder}
               value={newKeyProvider}
               onChange={(e) => setNewKeyProvider(e.target.value)}
             />
             <button type="submit" disabled={creating} className="btn-primary">
               {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlusCircle className="h-3.5 w-3.5" />}
-              Crear clave
+              {t.hrIntegration.createKey}
             </button>
           </form>
         )}
@@ -150,19 +150,19 @@ export function HrIntegrationView({ nodes, workCenters, onSynced, readOnly }: Hr
             <div key={k.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
               <div>
                 <p className="text-xs font-medium text-slate-800">{k.name}</p>
-                <p className="text-[11px] text-slate-500">{k.provider} · creada {k.created}</p>
+                <p className="text-[11px] text-slate-500">{k.provider} · {t.hrIntegration.createdOn(k.created)}</p>
               </div>
               <code className="rounded bg-slate-100 px-2 py-1 text-[11px] text-slate-500">{k.key}</code>
             </div>
           ))}
-          {keys.length === 0 && !loading && <p className="text-xs text-slate-500">Sin claves configuradas todavía.</p>}
+          {keys.length === 0 && !loading && <p className="text-xs text-slate-500">{t.hrIntegration.noKeys}</p>}
         </div>
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-900">Registro de sincronizaciones</h2>
-          <button className="icon-btn" onClick={refresh} title="Refrescar">
+          <h2 className="text-base font-semibold text-slate-900">{t.hrIntegration.syncLogTitle}</h2>
+          <button className="icon-btn" onClick={refresh} title={t.hrIntegration.refreshTitle}>
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
@@ -183,7 +183,7 @@ export function HrIntegrationView({ nodes, workCenters, onSynced, readOnly }: Hr
               <p className="mt-0.5 text-[10px] text-slate-400">{new Date(log.timestamp).toLocaleString()}</p>
             </div>
           ))}
-          {logs.length === 0 && !loading && <p className="text-xs text-slate-500">Aún no hay registros de sincronización.</p>}
+          {logs.length === 0 && !loading && <p className="text-xs text-slate-500">{t.hrIntegration.noLogs}</p>}
         </div>
       </div>
     </div>

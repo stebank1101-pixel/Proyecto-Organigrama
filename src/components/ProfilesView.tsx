@@ -2,10 +2,12 @@ import { Loader2, Shield, Trash2, User, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../lib/auth";
 import { createUserProfile, deleteUserProfile, fetchUsers } from "../lib/api";
+import { useT } from "../lib/i18n";
 import type { UserProfile } from "../types";
 
 export function ProfilesView() {
   const { user: currentUser } = useAuth();
+  const t = useT();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,25 +37,25 @@ export function ProfilesView() {
       setForm({ name: "", email: "", password: "", role: "viewer" });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo crear el perfil");
+      setError(err instanceof Error ? err.message : t.profiles.createError);
     } finally {
       setCreating(false);
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("¿Eliminar este perfil?")) return;
+    if (!confirm(t.profiles.deleteConfirm)) return;
     try {
       await deleteUserProfile(id);
       await refresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "No se pudo eliminar el perfil");
+      alert(err instanceof Error ? err.message : t.profiles.deleteError);
     }
   }
 
   function creatorName(createdBy: string | null) {
-    if (!createdBy) return "Sistema";
-    if (createdBy === currentUser?.id) return "Tú";
+    if (!createdBy) return t.common.system;
+    if (createdBy === currentUser?.id) return t.common.you;
     return users.find((u) => u.id === createdBy)?.name || "—";
   }
 
@@ -62,16 +64,17 @@ export function ProfilesView() {
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
           <UserPlus className="h-5 w-5 text-sky-600" />
-          <h2 className="text-base font-semibold text-slate-900">Crear nuevo perfil</h2>
+          <h2 className="text-base font-semibold text-slate-900">{t.profiles.createProfileTitle}</h2>
         </div>
         <p className="mb-4 text-xs text-slate-500">
-          Solo los perfiles con rol <strong>Administrador</strong> pueden crear, editar o eliminar información del
-          organigrama. Los perfiles <strong>Visualizador</strong> solo pueden consultar.
+          {t.profiles.createProfileDescriptionPre} <strong>{t.profiles.createProfileDescriptionAdmin}</strong>{" "}
+          {t.profiles.createProfileDescriptionMid} <strong>{t.profiles.createProfileDescriptionViewer}</strong>{" "}
+          {t.profiles.createProfileDescriptionPost}
         </p>
 
         <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
           <label className="block text-xs font-medium text-slate-600">
-            Nombre completo
+            {t.profiles.fullName}
             <input
               required
               className="input mt-1"
@@ -80,7 +83,7 @@ export function ProfilesView() {
             />
           </label>
           <label className="block text-xs font-medium text-slate-600">
-            Email
+            {t.profiles.email}
             <input
               type="email"
               required
@@ -90,7 +93,7 @@ export function ProfilesView() {
             />
           </label>
           <label className="block text-xs font-medium text-slate-600">
-            Contraseña
+            {t.profiles.password}
             <input
               type="password"
               required
@@ -101,14 +104,14 @@ export function ProfilesView() {
             />
           </label>
           <label className="block text-xs font-medium text-slate-600">
-            Rol
+            {t.profiles.role}
             <select
               className="input mt-1"
               value={form.role}
               onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as "admin" | "viewer" }))}
             >
-              <option value="viewer">Visualizador (solo lectura)</option>
-              <option value="admin">Administrador (puede modificar)</option>
+              <option value="viewer">{t.profiles.viewerOption}</option>
+              <option value="admin">{t.profiles.adminOption}</option>
             </select>
           </label>
 
@@ -117,14 +120,14 @@ export function ProfilesView() {
           <div className="col-span-2">
             <button type="submit" disabled={creating} className="btn-primary disabled:opacity-50">
               {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
-              Crear perfil
+              {t.profiles.createProfile}
             </button>
           </div>
         </form>
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">Perfiles existentes</h2>
+        <h2 className="mb-3 text-base font-semibold text-slate-900">{t.profiles.existingProfiles}</h2>
         <div className="space-y-2">
           {users.map((u) => (
             <div key={u.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
@@ -138,10 +141,10 @@ export function ProfilesView() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-slate-800">
-                    {u.name} {u.id === currentUser?.id && <span className="text-slate-400">(tú)</span>}
+                    {u.name} {u.id === currentUser?.id && <span className="text-slate-400">{t.profiles.youSuffix}</span>}
                   </p>
                   <p className="text-[11px] text-slate-500">
-                    {u.email} · creado por {creatorName(u.createdBy)}
+                    {u.email} · {t.profiles.createdBy(creatorName(u.createdBy))}
                   </p>
                 </div>
               </div>
@@ -151,17 +154,17 @@ export function ProfilesView() {
                     u.role === "admin" ? "bg-amber-100 text-amber-700" : "bg-slate-200 text-slate-600"
                   }`}
                 >
-                  {u.role === "admin" ? "Administrador" : "Visualizador"}
+                  {u.role === "admin" ? t.profiles.administrator : t.profiles.viewer}
                 </span>
                 {u.id !== currentUser?.id && (
-                  <button className="icon-btn text-rose-500 hover:bg-rose-50" title="Eliminar perfil" onClick={() => handleDelete(u.id)}>
+                  <button className="icon-btn text-rose-500 hover:bg-rose-50" title={t.profiles.deleteProfileTitle} onClick={() => handleDelete(u.id)}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
             </div>
           ))}
-          {users.length === 0 && !loading && <p className="text-xs text-slate-500">Sin perfiles.</p>}
+          {users.length === 0 && !loading && <p className="text-xs text-slate-500">{t.profiles.noProfiles}</p>}
         </div>
       </div>
     </div>

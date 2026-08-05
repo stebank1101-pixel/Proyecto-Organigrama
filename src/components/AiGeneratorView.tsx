@@ -1,13 +1,14 @@
 import { Loader2, PlusCircle, RefreshCw, Sparkles, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { generateAiOrg } from "../lib/api";
+import { useT } from "../lib/i18n";
 import { OrgIcon } from "../lib/icons";
 import { computeAllSedes } from "../lib/workCenters";
 import type { OrgNode, WorkCenter } from "../types";
 
 const ACCEPTED_FILE_TYPES = "image/png,image/jpeg,image/webp,application/pdf";
 
-function readFileAsBase64(file: File): Promise<{ mimeType: string; data: string }> {
+function readFileAsBase64(file: File, readErrorMessage: string): Promise<{ mimeType: string; data: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -15,7 +16,7 @@ function readFileAsBase64(file: File): Promise<{ mimeType: string; data: string 
       const base64 = result.split(",")[1] || "";
       resolve({ mimeType: file.type, data: base64 });
     };
-    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
+    reader.onerror = () => reject(new Error(readErrorMessage));
     reader.readAsDataURL(file);
   });
 }
@@ -28,6 +29,7 @@ interface AiGeneratorViewProps {
 }
 
 export function AiGeneratorView({ nodes, workCenters, onApply, readOnly }: AiGeneratorViewProps) {
+  const t = useT();
   const [prompt, setPrompt] = useState("");
   const [companyType, setCompanyType] = useState("");
   const [headcount, setHeadcount] = useState(12);
@@ -65,11 +67,11 @@ export function AiGeneratorView({ nodes, workCenters, onApply, readOnly }: AiGen
     setLoading(true);
     setError(null);
     try {
-      const image = file ? await readFileAsBase64(file) : null;
+      const image = file ? await readFileAsBase64(file, t.aiGenerator.readFileError) : null;
       const res = await generateAiOrg({ prompt, companyType, headcount, targetSede, image });
       setPreview(res.nodes || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al generar el organigrama con IA");
+      setError(err instanceof Error ? err.message : t.aiGenerator.generateError);
     } finally {
       setLoading(false);
     }
@@ -80,38 +82,34 @@ export function AiGeneratorView({ nodes, workCenters, onApply, readOnly }: AiGen
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-sky-600" />
-          <h2 className="text-base font-semibold text-slate-900">Generador de organigrama con IA (Gemini)</h2>
+          <h2 className="text-base font-semibold text-slate-900">{t.aiGenerator.title}</h2>
         </div>
 
         {readOnly && (
-          <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            Tu perfil es de solo lectura: puedes generar una vista previa, pero solo un administrador puede aplicarla al organigrama.
-          </p>
+          <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">{t.aiGenerator.readOnlyNotice}</p>
         )}
 
         <form onSubmit={handleGenerate} className="space-y-3">
           <label className="block text-xs font-medium text-slate-600">
-            Describe la empresa o el equipo
+            {t.aiGenerator.describeCompany}
             <textarea
               className="input mt-1 h-24 resize-none"
-              placeholder="Ej: Startup fintech de 40 personas con foco en pagos B2B en Latinoamérica..."
+              placeholder={t.aiGenerator.describePlaceholder}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
             />
           </label>
 
           <div className="block text-xs font-medium text-slate-600">
-            O sube una imagen o PDF de un organigrama existente (opcional)
-            <p className="mb-1.5 mt-0.5 text-[11px] font-normal text-slate-400">
-              La IA analizará el archivo y transcribirá esa estructura para este centro de trabajo.
-            </p>
+            {t.aiGenerator.uploadLabel}
+            <p className="mb-1.5 mt-0.5 text-[11px] font-normal text-slate-400">{t.aiGenerator.uploadHint}</p>
             {!file ? (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="btn-secondary w-full justify-center"
               >
-                <Upload className="h-3.5 w-3.5" /> Elegir imagen o PDF
+                <Upload className="h-3.5 w-3.5" /> {t.aiGenerator.chooseImagePdf}
               </button>
             ) : (
               <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
@@ -139,11 +137,11 @@ export function AiGeneratorView({ nodes, workCenters, onApply, readOnly }: AiGen
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-xs font-medium text-slate-600">
-              Tipo de empresa (opcional)
+              {t.aiGenerator.companyType}
               <input className="input mt-1" value={companyType} onChange={(e) => setCompanyType(e.target.value)} />
             </label>
             <label className="block text-xs font-medium text-slate-600">
-              Número aproximado de nodos
+              {t.aiGenerator.nodeCountLabel}
               <input
                 type="number"
                 min={3}
@@ -156,9 +154,9 @@ export function AiGeneratorView({ nodes, workCenters, onApply, readOnly }: AiGen
           </div>
 
           <label className="block text-xs font-medium text-slate-600">
-            Centro de trabajo destino
+            {t.aiGenerator.targetCenter}
             <select className="input mt-1" value={targetSede} onChange={(e) => setTargetSede(e.target.value)}>
-              <option value="">— Elige un centro —</option>
+              <option value="">{t.aiGenerator.chooseCenterOption}</option>
               {allSedes.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -171,7 +169,7 @@ export function AiGeneratorView({ nodes, workCenters, onApply, readOnly }: AiGen
 
           <button type="submit" disabled={loading || !targetSede} className="btn-primary w-full justify-center disabled:opacity-50">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {loading ? "Generando estructura..." : "Generar organigrama"}
+            {loading ? t.aiGenerator.generating : t.aiGenerator.generate}
           </button>
         </form>
       </div>
@@ -179,18 +177,18 @@ export function AiGeneratorView({ nodes, workCenters, onApply, readOnly }: AiGen
       {preview && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-900">Vista previa · {preview.length} nodos</h3>
+            <h3 className="text-sm font-semibold text-slate-900">{t.aiGenerator.previewTitle(preview.length)}</h3>
             <div className="flex gap-2">
               <button className="btn-secondary" onClick={() => setPreview(null)}>
-                <RefreshCw className="h-3.5 w-3.5" /> Descartar
+                <RefreshCw className="h-3.5 w-3.5" /> {t.aiGenerator.discard}
               </button>
               {!readOnly && (
                 <>
                   <button className="btn-secondary" onClick={() => onApply(preview, "append", targetSede)}>
-                    <PlusCircle className="h-3.5 w-3.5" /> Agregar al actual
+                    <PlusCircle className="h-3.5 w-3.5" /> {t.aiGenerator.addToCurrent}
                   </button>
                   <button className="btn-primary" onClick={() => onApply(preview, "replace", targetSede)}>
-                    Reemplazar organigrama
+                    {t.aiGenerator.replaceOrgChart}
                   </button>
                 </>
               )}

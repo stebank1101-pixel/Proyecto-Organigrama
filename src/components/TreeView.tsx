@@ -1,4 +1,5 @@
 import { forwardRef, useMemo, useRef, useState } from "react";
+import { useT } from "../lib/i18n";
 import type { OrgNode } from "../types";
 import { NodeCard } from "./NodeCard";
 
@@ -85,6 +86,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
   },
   forwardedRef
 ) {
+  const t = useT();
   const dragState = useRef<{ id: string; offsetX: number; offsetY: number; blockedIds: Set<string> } | null>(null);
   // grabOffsetX/Y is the pointer's distance from the CURRENT absolute bend point at drag
   // start; each move re-derives a fresh offset-from-default since the connected cards'
@@ -413,7 +415,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
   if (nodes.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-slate-500">
-        No hay nodos que coincidan con los filtros actuales.
+        {t.treeView.noNodesMatch}
       </div>
     );
   }
@@ -551,7 +553,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
                   onPointerDown={(e) => handleLinePointerDown(e, node.id, midX, midY)}
                   onDoubleClick={(e) => handleLineDoubleClick(e, node.id)}
                 >
-                  <title>Arrastra para curvar esta conexión (doble clic para restablecer)</title>
+                  <title>{t.treeView.bendLineHint}</title>
                 </circle>
                 <g
                   transform={`translate(${midX + 26}, ${midY - 26})`}
@@ -563,7 +565,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
                   <text textAnchor="middle" dominantBaseline="central" fontSize={10} className="select-none fill-rose-500">
                     ×
                   </text>
-                  <title>Quitar esta línea (el nodo queda sin jefe)</title>
+                  <title>{t.treeView.removeLineHint}</title>
                 </g>
               </g>
             );
@@ -600,7 +602,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
                     style={{ pointerEvents: "auto", cursor: "grab", touchAction: "none" }}
                     onPointerDown={(e) => handleCoordLinePointerDown(e, node.id, link.targetId, midX, midY)}
                   >
-                    <title>Arrastra para curvar esta línea de coordinación</title>
+                    <title>{t.treeView.bendCoordLineHint}</title>
                   </circle>
                   <g
                     transform={`translate(${midX - 28}, ${midY - 28})`}
@@ -618,7 +620,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
                       strokeWidth={1.5}
                       strokeDasharray={link.style === "dashed" ? "2 1.5" : undefined}
                     />
-                    <title>{link.style === "dashed" ? "Cambiar a línea continua" : "Cambiar a línea punteada"}</title>
+                    <title>{link.style === "dashed" ? t.treeView.switchToSolid : t.treeView.switchToDashed}</title>
                   </g>
                   <g
                     transform={`translate(${midX + 28}, ${midY - 28})`}
@@ -630,7 +632,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
                     <text textAnchor="middle" dominantBaseline="central" fontSize={10} className="select-none fill-rose-500">
                       ×
                     </text>
-                    <title>Quitar esta línea de coordinación</title>
+                    <title>{t.treeView.removeCoordLineHint}</title>
                   </g>
                 </g>
               );

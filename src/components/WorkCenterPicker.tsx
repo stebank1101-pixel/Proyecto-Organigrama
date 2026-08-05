@@ -1,4 +1,5 @@
 import { AlertTriangle, Building2, Eye, Settings } from "lucide-react";
+import { useT } from "../lib/i18n";
 import type { WorkCenterRow } from "../lib/workCenters";
 
 interface WorkCenterPickerProps {
@@ -11,16 +12,17 @@ interface WorkCenterPickerProps {
 }
 
 export function WorkCenterPicker({ rows, readOnly, error, onSelect, onSelectAll, onManage }: WorkCenterPickerProps) {
+  const t = useT();
   return (
     <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 overflow-y-auto p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Centros de trabajo</h2>
-          <p className="text-xs text-slate-500">Elige un centro para ver y editar su organigrama.</p>
+          <h2 className="text-base font-semibold text-slate-900">{t.workCenterPicker.title}</h2>
+          <p className="text-xs text-slate-500">{t.workCenterPicker.description}</p>
         </div>
         {!readOnly && (
           <button onClick={onManage} className="btn-secondary">
-            <Settings className="h-3.5 w-3.5" /> Gestionar centros
+            <Settings className="h-3.5 w-3.5" /> {t.workCenterPicker.manageCenters}
           </button>
         )}
       </div>
@@ -34,10 +36,10 @@ export function WorkCenterPicker({ rows, readOnly, error, onSelect, onSelectAll,
       {rows.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-sm text-slate-400">
           <Building2 className="h-8 w-8 text-slate-300" />
-          <p>No hay centros de trabajo todavía.</p>
+          <p>{t.workCenterPicker.noCenters}</p>
           {!readOnly && (
             <button onClick={onManage} className="btn-primary mt-2">
-              <Settings className="h-3.5 w-3.5" /> Crear el primer centro
+              <Settings className="h-3.5 w-3.5" /> {t.workCenterPicker.createFirstCenter}
             </button>
           )}
         </div>
@@ -50,8 +52,8 @@ export function WorkCenterPicker({ rows, readOnly, error, onSelect, onSelectAll,
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-100 text-sky-600">
               <Eye className="h-4 w-4" />
             </div>
-            <p className="text-sm font-semibold text-slate-800">Ver todos los centros</p>
-            <p className="text-[11px] text-slate-400">Vista combinada de solo lectura</p>
+            <p className="text-sm font-semibold text-slate-800">{t.workCenterPicker.viewAllCenters}</p>
+            <p className="text-[11px] text-slate-400">{t.workCenterPicker.readOnlyOverview}</p>
           </button>
 
           {rows.map((row) => (
@@ -64,9 +66,7 @@ export function WorkCenterPicker({ rows, readOnly, error, onSelect, onSelectAll,
                 {row.icon ? <img src={row.icon} alt="" className="h-full w-full object-cover" /> : <Building2 className="h-4 w-4" />}
               </div>
               <p className="truncate text-sm font-semibold text-slate-800">{row.name}</p>
-              <p className="text-[11px] text-slate-400">
-                {row.count} {row.count === 1 ? "colaborador" : "colaboradores"}
-              </p>
+              <p className="text-[11px] text-slate-400">{t.common.collaboratorCount(row.count)}</p>
             </button>
           ))}
         </div>
