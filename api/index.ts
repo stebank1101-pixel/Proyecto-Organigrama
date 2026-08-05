@@ -837,6 +837,57 @@ app.get("/api/v1/integrations/logs", async (req, res) => {
   }
 });
 
+// Positions AI-generated nodes as an actual top-down tree (rows by hierarchy depth,
+// each parent centered over its own children) instead of a mechanical N-per-row grid —
+// the model's own node ORDER carries no layout information, so without this the result
+// ignored the org chart's real shape regardless of how well the model read the source.
+function layoutAiNodes(nodes: { id: string; parentId: string | null }[]): Map<string, { x: number; y: number }> {
+  const idSet = new Set(nodes.map((n) => n.id));
+  const childrenByParent = new Map<string, string[]>();
+  for (const n of nodes) {
+    const key = n.parentId && idSet.has(n.parentId) ? n.parentId : "__root__";
+    if (!childrenByParent.has(key)) childrenByParent.set(key, []);
+    childrenByParent.get(key)!.push(n.id);
+  }
+
+  const COL_W = 260;
+  const ROW_H = 190;
+  const positions = new Map<string, { x: number; y: number }>();
+  const visiting = new Set<string>();
+  let nextCol = 0;
+
+  function place(id: string, depth: number): number {
+    // Defends against a cyclic parentId chain in the model's output — treat a node
+    // revisited mid-traversal as a leaf instead of recursing forever.
+    if (visiting.has(id)) {
+      const x = nextCol++;
+      positions.set(id, { x: x * COL_W, y: depth * ROW_H });
+      return x;
+    }
+    visiting.add(id);
+    const children = childrenByParent.get(id) || [];
+    let x: number;
+    if (children.length === 0) {
+      x = nextCol++;
+    } else {
+      const childXs = children.map((childId) => place(childId, depth + 1));
+      x = (Math.min(...childXs) + Math.max(...childXs)) / 2;
+    }
+    positions.set(id, { x: x * COL_W, y: depth * ROW_H });
+    visiting.delete(id);
+    return x;
+  }
+
+  for (const rootId of childrenByParent.get("__root__") || []) place(rootId, 0);
+  // Any node whose parentId never resolved to a real id (and isn't null) still needs a
+  // position — place it as its own extra root rather than dropping it silently.
+  for (const n of nodes) {
+    if (!positions.has(n.id)) place(n.id, 0);
+  }
+
+  return positions;
+}
+
 // Gemini AI Organigram Generator Endpoint
 app.post("/api/ai/generate-org", async (req, res) => {
   try {
@@ -861,9 +912,11 @@ app.post("/api/ai/generate-org", async (req, res) => {
     const ai = new GoogleGenAI({ apiKey });
 
     const sourceInstructions = image
-      ? `Se adjunta una imagen o documento (captura, foto o PDF) de un organigrama existente. Analiza cuidadosamente su contenido -cajas, jerarquía, líneas de dependencia, nombres y cargos visibles- y transcribe esa estructura real lo más fielmente posible.${
+      ? `Se adjunta una imagen o documento (captura, foto o PDF) de un organigrama existente. Puede tener muchas cajas y varios niveles jerárquicos (10, 30, 50 o más) — eso es normal y esperado, transcríbelas TODAS sin excepción.
+Analiza cuidadosamente CADA caja visible en la imagen, sin importar cuán pequeña, secundaria o repetida parezca (asistentes, auxiliares, conductores, cargos de apoyo, coordinadores, etc.): ninguna debe quedar fuera. Identifica también todas las líneas de jerarquía (sólidas) para reconstruir el parentId correcto de cada nodo, y no confundas líneas punteadas de coordinación con líneas de jerarquía.
+PROHIBIDO resumir, agrupar varias cajas en una sola, o devolver solo una muestra representativa: el número de nodos en tu respuesta debe igualar el número de cajas reales que se ven en la imagen.${
           prompt ? ` Ten en cuenta también estas indicaciones adicionales del usuario: "${prompt}".` : ""
-        } Si algún nombre o dato no es legible, infiere un valor razonable en su lugar, pero respeta la jerarquía y los cargos que sí puedas leer.`
+        } Si algún nombre o dato puntual no es legible, infiere un valor razonable en su lugar, pero nunca omitas la caja completa solo porque un dato sea difícil de leer.`
       : `Empresa / Descripción: "${prompt || companyType || "Empresa tecnológica de rápido crecimiento"}"
 Número aproximado de nodos: ${headcount || 12}`;
 
@@ -887,7 +940,8 @@ REGLAS DE SALIDA OBLIGATORIAS:
 - customBadge: distintivo corporativo corto (ej: "Comité Ejecutivo", "Tech Core", "Squad Lead")
 - iconName: nombre de icono lucide (Crown, Cpu, Users, Briefcase, Server, Palette, Globe, Target, Shield, Award)
 
-ASEGÚRATE de que el primer nodo sea la máxima autoridad de este centro con parentId: null, y que los directores dependan de él, los managers dependan de directores, etc.`;
+ASEGÚRATE de que el primer nodo sea la máxima autoridad de este centro con parentId: null, y que los directores dependan de él, los managers dependan de directores, etc.
+${image ? "Recuerda: el array \"nodes\" debe incluir absolutamente todas las cajas que aparecen en la imagen adjunta, sin resumir ni truncar la lista." : ""}`;
 
     const contents = image
       ? [{ role: "user", parts: [{ text: sysPrompt }, { inlineData: { mimeType: image.mimeType, data: image.data } }] }]
@@ -897,7 +951,11 @@ ASEGÚRATE de que el primer nodo sea la máxima autoridad de este centro con par
       model: "gemini-flash-latest",
       contents,
       config: {
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        // A detailed org chart image (40+ boxes) needs a generous output budget — the
+        // model would otherwise summarize/truncate the node list to fit a smaller
+        // response.
+        maxOutputTokens: 32768
       }
     });
 
@@ -905,16 +963,17 @@ ASEGÚRATE de que el primer nodo sea la máxima autoridad de este centro con par
     const parsed = JSON.parse(text);
 
     if (parsed && Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
-      // Calculate coordinates for free view auto placement. `sede` is force-stamped
-      // server-side rather than trusted from the model's output.
-      const nodesWithCoords = parsed.nodes.map((node: any, idx: number) => {
+      // `sede` is force-stamped server-side rather than trusted from the model's output.
+      const positions = layoutAiNodes(parsed.nodes.map((n: any) => ({ id: n.id, parentId: n.parentId ?? null })));
+      const nodesWithCoords = parsed.nodes.map((node: any) => {
+        const pos = positions.get(node.id) || { x: 0, y: 0 };
         return {
           ...node,
           sede: targetSede,
           avatar: node.avatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
           assignees: node.assignees || [],
-          freeX: 350 + (idx % 3) * 260,
-          freeY: 80 + Math.floor(idx / 3) * 180,
+          freeX: 80 + pos.x,
+          freeY: 60 + pos.y,
           status: "active"
         };
       });
