@@ -461,7 +461,14 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
 
   if (nodes.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-slate-500">
+      <div
+        className="relative flex h-full items-center justify-center text-sm text-slate-500"
+        style={{
+          ...(canvasBackgroundColor ? { backgroundColor: canvasBackgroundColor } : {}),
+          ...(canvasBackgroundImage ? { backgroundImage: `url(${canvasBackgroundImage})`, backgroundRepeat: "repeat" } : {}),
+        }}
+      >
+        {logo && <img src={logo} alt="" className="pointer-events-none absolute left-6 top-6 max-h-16 max-w-[200px] object-contain" />}
         {t.treeView.noNodesMatch}
       </div>
     );
