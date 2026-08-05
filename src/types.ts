@@ -21,6 +21,9 @@ export interface WorkCenter {
   headcount: number;
   budget: string;
   icon?: string;
+  /** The one work center (at most) that opens automatically when the Organigrama tab
+   * loads, instead of the "Centros de trabajo" picker screen. */
+  isDefault?: boolean;
 }
 
 export interface OrgNode {

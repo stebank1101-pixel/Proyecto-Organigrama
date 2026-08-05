@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronDown, ChevronRight, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Pencil, Plus, Star, Trash2, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { useT } from "../lib/i18n";
 import type { WorkCenterRow } from "../lib/workCenters";
@@ -27,6 +27,7 @@ interface WorkCenterManagerModalProps {
     name: string,
     profile: { address: string; email: string; phone: string; headcount: number; budget: string; icon: string }
   ) => void;
+  onSetDefault: (name: string, isDefault: boolean) => void;
   onEditNode: (node: OrgNode) => void;
   onCreateNode: (sedeName: string) => void;
   onDeleteNode: (node: OrgNode) => void;
@@ -43,6 +44,7 @@ export function WorkCenterManagerModal({
   onRename,
   onDelete,
   onUpdateProfile,
+  onSetDefault,
   onEditNode,
   onCreateNode,
   onDeleteNode,
@@ -176,13 +178,32 @@ export function WorkCenterManagerModal({
                     />
                   ) : (
                     <button className="flex-1 text-left" onClick={() => toggleExpand(c)}>
-                      <p className="text-sm font-medium text-slate-800">{c.name}</p>
+                      <p className="flex items-center gap-1.5 text-sm font-medium text-slate-800">
+                        {c.name}
+                        {c.isDefault && (
+                          <span
+                            className="flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
+                            title={t.workCenterManager.isDefaultBadge}
+                          >
+                            <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" /> {t.workCenterManager.defaultLabel}
+                          </span>
+                        )}
+                      </p>
                       <p className="text-[11px] text-slate-400">{t.common.collaboratorCount(c.count)}</p>
                     </button>
                   )}
 
                   {!readOnly && (
                     <>
+                      <button
+                        className={`icon-btn border ${
+                          c.isDefault ? "border-amber-300 bg-amber-50 text-amber-500" : "border-slate-200 text-slate-300 hover:text-amber-400"
+                        }`}
+                        title={c.isDefault ? t.workCenterManager.unsetDefault : t.workCenterManager.setDefault}
+                        onClick={() => onSetDefault(c.name, !c.isDefault)}
+                      >
+                        <Star className={`h-3.5 w-3.5 ${c.isDefault ? "fill-amber-500" : ""}`} />
+                      </button>
                       <button className="icon-btn border border-slate-200" title={t.workCenterManager.rename} onClick={() => startEdit(c.name)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </button>

@@ -325,6 +325,19 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     startAutoScroll();
   }
 
+  // Explicit connect handle on the card's hover toolbar: same coordination-line drag as
+  // Shift+drag or "Conectar líneas" mode, just started from a dedicated button so it doesn't
+  // depend on knowing either shortcut. Works toward a card dropped in any direction.
+  function handleStartConnect(node: OrgNode, e: React.PointerEvent) {
+    if (readOnly) return;
+    e.preventDefault();
+    e.stopPropagation();
+    document.body.style.userSelect = "none";
+    linkDragState.current = { id: node.id };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    startAutoScroll();
+  }
+
   // The connector's natural (no manual bend) midpoint, recomputed from the two cards'
   // LIVE positions — this is what a stored offset is relative to.
   function getDefaultMid(node: OrgNode): { x: number; y: number } | null {
@@ -630,6 +643,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
             onDelete={onDelete}
             onAddChild={onAddChild}
             onRemoveBoss={onRemoveBoss}
+            onStartConnect={onCoordinationLink ? handleStartConnect : undefined}
             highlighted={highlightedId === node.id}
             readOnly={readOnly}
             compact={compact}

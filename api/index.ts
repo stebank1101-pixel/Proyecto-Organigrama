@@ -154,10 +154,11 @@ interface WorkCenterRecord {
   headcount: number;
   budget: string;
   icon: string;
+  isDefault: boolean;
 }
 
 function blankCenter(name: string): WorkCenterRecord {
-  return { name, address: "", email: "", phone: "", headcount: 0, budget: "", icon: "" };
+  return { name, address: "", email: "", phone: "", headcount: 0, budget: "", icon: "", isDefault: false };
 }
 
 let inMemoryWorkCenters: WorkCenterRecord[] = [];
@@ -173,7 +174,8 @@ async function loadWorkCenters(): Promise<WorkCenterRecord[]> {
     phone: row.phone || "",
     headcount: row.headcount || 0,
     budget: row.budget || "",
-    icon: row.icon || ""
+    icon: row.icon || "",
+    isDefault: row.is_default || false
   }));
 }
 
@@ -212,6 +214,23 @@ async function updateWorkCenterProfile(name: string, profile: Partial<Omit<WorkC
     return;
   }
   const { error } = await supabase.from("work_centers").upsert({ name, ...profile }, { onConflict: "name" });
+  if (error) throw new Error(error.message);
+}
+
+// Only one work center can be the default (the org chart that opens automatically instead
+// of the "Centros de trabajo" picker), so setting it also clears the flag on every other
+// center. Kept separate from updateWorkCenterProfile since it touches more than one row.
+async function setDefaultWorkCenter(name: string, isDefault: boolean): Promise<void> {
+  if (!supabase) {
+    inMemoryWorkCenters = inMemoryWorkCenters.map((c) => ({ ...c, isDefault: c.name === name ? isDefault : false }));
+    if (!inMemoryWorkCenters.some((c) => c.name === name)) inMemoryWorkCenters.push({ ...blankCenter(name), isDefault });
+    return;
+  }
+  if (isDefault) {
+    const { error: clearError } = await supabase.from("work_centers").update({ is_default: false }).neq("name", name);
+    if (clearError) throw new Error(clearError.message);
+  }
+  const { error } = await supabase.from("work_centers").upsert({ name, is_default: isDefault }, { onConflict: "name" });
   if (error) throw new Error(error.message);
 }
 
@@ -629,7 +648,7 @@ app.put("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
 
 app.patch("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
   const name = decodeURIComponent(req.params.name);
-  const { address, email, phone, headcount, budget, icon } = req.body || {};
+  const { address, email, phone, headcount, budget, icon, isDefault } = req.body || {};
   try {
     await updateWorkCenterProfile(name, {
       ...(address !== undefined ? { address } : {}),
@@ -639,6 +658,9 @@ app.patch("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
       ...(budget !== undefined ? { budget } : {}),
       ...(icon !== undefined ? { icon } : {})
     });
+    if (isDefault !== undefined) {
+      await setDefaultWorkCenter(name, !!isDefault);
+    }
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

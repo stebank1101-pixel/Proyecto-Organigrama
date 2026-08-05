@@ -40,6 +40,7 @@ alter table public.work_centers add column if not exists phone text not null def
 alter table public.work_centers add column if not exists headcount integer not null default 0;
 alter table public.work_centers add column if not exists budget text not null default '';
 alter table public.work_centers add column if not exists icon text;
+alter table public.work_centers add column if not exists is_default boolean not null default false;
 alter table public.work_centers disable row level security;
 
 -- ============================================================

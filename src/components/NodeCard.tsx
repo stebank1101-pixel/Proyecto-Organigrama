@@ -1,4 +1,4 @@
-import { ExternalLink, Pencil, Plus, Trash2, Unlink } from "lucide-react";
+import { ExternalLink, Link2, Pencil, Plus, Trash2, Unlink } from "lucide-react";
 import { getDepartmentStyle } from "../lib/departmentColors";
 import { useT } from "../lib/i18n";
 import { OrgIcon } from "../lib/icons";
@@ -10,6 +10,10 @@ interface NodeCardProps {
   onDelete: (node: OrgNode) => void;
   onAddChild: (parent: OrgNode) => void;
   onRemoveBoss?: (node: OrgNode) => void;
+  /** Starts a coordination-line drag straight from this card's toolbar — an explicit handle
+   * so connecting two cards doesn't require knowing about Shift+drag or the "Conectar
+   * líneas" mode toggle first. Works toward a card dropped in any direction. */
+  onStartConnect?: (node: OrgNode, e: React.PointerEvent) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   highlighted?: boolean;
   readOnly?: boolean;
@@ -18,7 +22,18 @@ interface NodeCardProps {
   compact?: boolean;
 }
 
-export function NodeCard({ node, onEdit, onDelete, onAddChild, onRemoveBoss, dragHandleProps, highlighted, readOnly, compact }: NodeCardProps) {
+export function NodeCard({
+  node,
+  onEdit,
+  onDelete,
+  onAddChild,
+  onRemoveBoss,
+  onStartConnect,
+  dragHandleProps,
+  highlighted,
+  readOnly,
+  compact,
+}: NodeCardProps) {
   const t = useT();
   const isLink = !!node.linkTargetSede;
   const style = getDepartmentStyle(node.department);
@@ -99,6 +114,16 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, onRemoveBoss, dra
           >
             <Plus className="h-3 w-3" />
           </button>
+          {onStartConnect && (
+            <button
+              type="button"
+              onPointerDown={(e) => onStartConnect(node, e)}
+              className="cursor-grab rounded-full bg-white p-1.5 text-purple-500 shadow ring-1 ring-slate-200 hover:bg-purple-50 active:cursor-grabbing"
+              title={t.nodeCard.connectLine}
+            >
+              <Link2 className="h-3 w-3" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onEdit(node)}

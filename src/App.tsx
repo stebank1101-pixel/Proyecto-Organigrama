@@ -275,6 +275,26 @@ export default function App() {
     }
   }
 
+  // Kept separate from handleUpdateWorkCenterProfile: only one center can be default, so
+  // setting it here also has to clear the flag on every other center locally — mirroring
+  // what the backend does server-side — instead of merging just this one center's patch.
+  async function handleSetDefaultWorkCenter(name: string, isDefault: boolean): Promise<boolean> {
+    setCenterError(null);
+    try {
+      await updateWorkCenterProfileApi(name, { isDefault });
+      setWorkCenters((prev) => {
+        const cleared = prev.map((c) => ({ ...c, isDefault: false }));
+        const existing = cleared.find((c) => c.name === name);
+        if (existing) return cleared.map((c) => (c.name === name ? { ...c, isDefault } : c));
+        return [...cleared, { name, address: "", email: "", phone: "", headcount: 0, budget: "", isDefault }];
+      });
+      return true;
+    } catch (err) {
+      setCenterError(err instanceof Error ? err.message : t.app.updateCenterError);
+      return false;
+    }
+  }
+
   if (authLoading) {
     return (
       <div className="flex h-screen items-center justify-center gap-2 bg-slate-50 text-slate-500">
@@ -326,6 +346,7 @@ export default function App() {
             onRenameWorkCenter={handleRenameWorkCenter}
             onDeleteWorkCenter={handleDeleteWorkCenter}
             onUpdateWorkCenterProfile={handleUpdateWorkCenterProfile}
+            onSetDefaultWorkCenter={handleSetDefaultWorkCenter}
             saving={saving}
             dirty={dirty}
             readOnly={!isAdmin}

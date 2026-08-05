@@ -113,6 +113,7 @@ export const es = {
     inactive: "Inactivo",
     untitledRole: "Cargo sin definir",
     addSubordinate: "Agregar subordinado",
+    connectLine: "Arrastra hacia cualquier otra tarjeta para conectarlas con una línea",
     edit: "Editar",
     removeBoss: "Quitar jefe directo (deja al nodo sin jefe)",
     delete: "Eliminar",
@@ -278,6 +279,10 @@ export const es = {
     add: "Agregar",
     noCollaborators: "Sin colaboradores en este centro.",
     vacancy: "Vacante",
+    defaultLabel: "Inicial",
+    isDefaultBadge: "Este organigrama se abre automáticamente al entrar",
+    setDefault: "Usar como organigrama inicial",
+    unsetDefault: "Quitar como organigrama inicial",
   },
   workCenterPicker: {
     title: "Centros de trabajo",

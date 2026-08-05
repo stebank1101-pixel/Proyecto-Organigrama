@@ -37,6 +37,7 @@ interface OrgChartViewProps {
   onRenameWorkCenter: (oldName: string, newName: string) => Promise<boolean>;
   onDeleteWorkCenter: (name: string) => Promise<boolean>;
   onUpdateWorkCenterProfile: (name: string, profile: Partial<Omit<WorkCenter, "name">>) => Promise<boolean>;
+  onSetDefaultWorkCenter: (name: string, isDefault: boolean) => Promise<boolean>;
   saving: boolean;
   dirty: boolean;
   readOnly?: boolean;
@@ -90,12 +91,17 @@ export function OrgChartView({
   onRenameWorkCenter,
   onDeleteWorkCenter,
   onUpdateWorkCenterProfile,
+  onSetDefaultWorkCenter,
   saving,
   dirty,
   readOnly,
 }: OrgChartViewProps) {
   const t = useT();
   const [selectedCenter, setSelectedCenter] = useState<CenterSelection>(null);
+  // Once work centers finish loading, jump straight to whichever one is marked as default
+  // instead of the picker — but only the first time, so deliberately going back to the
+  // picker later (via "Volver a centros de trabajo") isn't immediately overridden.
+  const didAutoSelectDefault = useRef(false);
   // Compact shows only area + cargo per box; detailed reveals the rest of the node's
   // data (contact info, badges, metrics) for whoever needs it later. Remembered per browser.
   const [compact, setCompact] = useState(() => localStorage.getItem("orgcraft.compactCards") !== "false");
@@ -123,6 +129,18 @@ export function OrgChartView({
   const panState = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
 
   const activeCenter = selectedCenter && selectedCenter !== "ALL" ? selectedCenter : null;
+
+  useEffect(() => {
+    if (didAutoSelectDefault.current) return;
+    if (selectedCenter !== null) {
+      didAutoSelectDefault.current = true;
+      return;
+    }
+    if (workCenters.length === 0) return; // still loading — try again once it arrives
+    didAutoSelectDefault.current = true;
+    const defaultCenter = workCenters.find((c) => c.isDefault);
+    if (defaultCenter) setSelectedCenter(defaultCenter.name);
+  }, [workCenters, selectedCenter]);
 
   useLayoutEffect(() => {
     const container = scrollRef.current;
@@ -462,6 +480,7 @@ export function OrgChartView({
         onRename={handleRenameCenter}
         onDelete={handleDeleteCenter}
         onUpdateProfile={onUpdateWorkCenterProfile}
+        onSetDefault={onSetDefaultWorkCenter}
         onEditNode={openEdit}
         onCreateNode={openCreateForCenter}
         onDeleteNode={setDeleteTarget}

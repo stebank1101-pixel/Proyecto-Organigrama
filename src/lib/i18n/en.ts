@@ -115,6 +115,7 @@ export const en: Dictionary = {
     inactive: "Inactive",
     untitledRole: "Untitled role",
     addSubordinate: "Add subordinate",
+    connectLine: "Drag to any other card to connect them with a line",
     edit: "Edit",
     removeBoss: "Remove direct manager (leaves the node without a manager)",
     delete: "Delete",
@@ -280,6 +281,10 @@ export const en: Dictionary = {
     add: "Add",
     noCollaborators: "No team members in this center.",
     vacancy: "Vacant",
+    defaultLabel: "Home",
+    isDefaultBadge: "This org chart opens automatically on load",
+    setDefault: "Use as the home org chart",
+    unsetDefault: "Remove as the home org chart",
   },
   workCenterPicker: {
     title: "Work centers",
