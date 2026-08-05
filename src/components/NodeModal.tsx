@@ -18,7 +18,33 @@ interface NodeModalProps {
   onSave: (node: OrgNode) => void;
 }
 
-function emptyNode(defaultParentId: string | null, defaultSede?: string): OrgNode {
+function mostCommon(values: (string | undefined)[]): string | undefined {
+  const counts = new Map<string, number>();
+  for (const v of values) {
+    if (!v) continue;
+    counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+  let best: string | undefined;
+  let bestCount = 0;
+  for (const [v, c] of counts) {
+    if (c > bestCount) {
+      best = v;
+      bestCount = c;
+    }
+  }
+  return best;
+}
+
+function dominantNodeColors(nodes: OrgNode[], sede?: string): Pick<OrgNode, "cardColor" | "textColor" | "borderColor"> {
+  const scoped = sede ? nodes.filter((n) => n.sede === sede) : nodes;
+  return {
+    cardColor: mostCommon(scoped.map((n) => n.cardColor)),
+    textColor: mostCommon(scoped.map((n) => n.textColor)),
+    borderColor: mostCommon(scoped.map((n) => n.borderColor)),
+  };
+}
+
+function emptyNode(defaultParentId: string | null, defaultSede: string | undefined, colorDefaults: Pick<OrgNode, "cardColor" | "textColor" | "borderColor">): OrgNode {
   return {
     id: "",
     name: "",
@@ -37,6 +63,9 @@ function emptyNode(defaultParentId: string | null, defaultSede?: string): OrgNod
     status: "active",
     customBadge: "",
     iconName: "User",
+    cardColor: colorDefaults.cardColor,
+    textColor: colorDefaults.textColor,
+    borderColor: colorDefaults.borderColor,
   };
 }
 
@@ -57,13 +86,14 @@ function getDescendantIds(nodeId: string, nodes: OrgNode[]): Set<string> {
 
 export function NodeModal({ open, initial, defaultParentId, defaultSede, nodes, sedeOptions, onClose, onSave }: NodeModalProps) {
   const t = useT();
-  const [form, setForm] = useState<OrgNode>(() => initial ?? emptyNode(defaultParentId, defaultSede));
+  const [form, setForm] = useState<OrgNode>(() => initial ?? emptyNode(defaultParentId, defaultSede, dominantNodeColors(nodes, defaultSede)));
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
-      setForm(initial ?? emptyNode(defaultParentId, defaultSede));
+      setForm(initial ?? emptyNode(defaultParentId, defaultSede, dominantNodeColors(nodes, defaultSede)));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial, defaultParentId, defaultSede]);
 
   if (!open) return null;
