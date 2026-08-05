@@ -43,6 +43,7 @@ export interface OrgNode {
   iconName: string;
   cardColor?: string;
   textColor?: string;
+  borderColor?: string;
   fontFamily?: string;
   customIcon?: string;
   /** Manual bend for the connector line coming from this node's parent, stored as an

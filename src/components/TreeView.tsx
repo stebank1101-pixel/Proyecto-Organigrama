@@ -40,6 +40,102 @@ function clipToRectEdge(cx: number, cy: number, towardX: number, towardY: number
   return { x: cx + dx * t, y: cy + dy * t };
 }
 
+// Maps a point on a w×h rectangle's boundary (local coords, origin at top-left) to a single
+// distance-along-the-perimeter value, and back — lets many attachment points on the same
+// card be treated as positions on one line and spread out evenly.
+function pointToPerimeterT(localX: number, localY: number, w: number, h: number): number {
+  const eps = 0.5;
+  if (localY <= eps) return localX; // top edge, left -> right
+  if (localX >= w - eps) return w + localY; // right edge, top -> bottom
+  if (localY >= h - eps) return w + h + (w - localX); // bottom edge, right -> left
+  return w + h + w + (h - localY); // left edge, bottom -> top
+}
+
+function perimeterPoint(t: number, w: number, h: number): { x: number; y: number } {
+  const perim = 2 * (w + h);
+  let rem = ((t % perim) + perim) % perim;
+  if (rem <= w) return { x: rem, y: 0 };
+  rem -= w;
+  if (rem <= h) return { x: w, y: rem };
+  rem -= h;
+  if (rem <= w) return { x: w - rem, y: h };
+  rem -= w;
+  return { x: 0, y: h - rem };
+}
+
+// Multiple coordination lines leaving/entering the same card in a similar direction would
+// otherwise all land on nearly the same edge pixel (the ray-to-center intersection), making
+// them look glued together at one point instead of visibly joining distinct cards. This
+// nudges same-card attachments apart along the perimeter, preserving their relative order.
+const COORD_ATTACH_MIN_GAP = 14;
+
+function declutterAttachments(items: { key: string; t: number }[]): Map<string, number> {
+  const sorted = [...items].sort((a, b) => a.t - b.t);
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].t - sorted[i - 1].t < COORD_ATTACH_MIN_GAP) {
+      sorted[i] = { ...sorted[i], t: sorted[i - 1].t + COORD_ATTACH_MIN_GAP };
+    }
+  }
+  return new Map(sorted.map((s) => [s.key, s.t]));
+}
+
+interface CoordAnchor {
+  p1: { x: number; y: number };
+  p2: { x: number; y: number };
+}
+
+// Computes, for every coordination link, where its line should touch each of the two cards
+// — spread along each card's edge so simultaneous links don't bunch at a single point.
+function computeCoordAnchors(nodes: OrgNode[], nodesById: Map<string, OrgNode>, w: number, h: number): Map<string, CoordAnchor> {
+  const perNode = new Map<string, { key: string; t: number }[]>();
+
+  function addAttachment(nodeId: string, key: string, cx: number, cy: number, towardX: number, towardY: number) {
+    const node = nodesById.get(nodeId);
+    if (!node) return;
+    const raw = clipToRectEdge(cx, cy, towardX, towardY, w, h);
+    const t = pointToPerimeterT(raw.x - node.freeX, raw.y - node.freeY, w, h);
+    if (!perNode.has(nodeId)) perNode.set(nodeId, []);
+    perNode.get(nodeId)!.push({ key, t });
+  }
+
+  const links: { key: string; sourceId: string; targetId: string }[] = [];
+  for (const node of nodes) {
+    for (const link of node.coordinationLinks || []) {
+      const target = nodesById.get(link.targetId);
+      if (!target) continue;
+      const key = `${node.id}->${link.targetId}`;
+      links.push({ key, sourceId: node.id, targetId: link.targetId });
+      const cx1 = node.freeX + w / 2;
+      const cy1 = node.freeY + h / 2;
+      const cx2 = target.freeX + w / 2;
+      const cy2 = target.freeY + h / 2;
+      addAttachment(node.id, key, cx1, cy1, cx2, cy2);
+      addAttachment(target.id, key, cx2, cy2, cx1, cy1);
+    }
+  }
+
+  const declutteredByNode = new Map<string, Map<string, number>>();
+  for (const [nodeId, items] of perNode) {
+    declutteredByNode.set(nodeId, declutterAttachments(items));
+  }
+
+  const result = new Map<string, CoordAnchor>();
+  for (const { key, sourceId, targetId } of links) {
+    const sourceNode = nodesById.get(sourceId);
+    const targetNode = nodesById.get(targetId);
+    const sT = declutteredByNode.get(sourceId)?.get(key);
+    const tT = declutteredByNode.get(targetId)?.get(key);
+    if (!sourceNode || !targetNode || sT === undefined || tT === undefined) continue;
+    const p1Local = perimeterPoint(sT, w, h);
+    const p2Local = perimeterPoint(tT, w, h);
+    result.set(key, {
+      p1: { x: sourceNode.freeX + p1Local.x, y: sourceNode.freeY + p1Local.y },
+      p2: { x: targetNode.freeX + p2Local.x, y: targetNode.freeY + p2Local.y },
+    });
+  }
+  return result;
+}
+
 interface TreeViewProps {
   nodes: OrgNode[];
   onEdit: (node: OrgNode) => void;
@@ -226,13 +322,15 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
   }
 
   function getCoordDefaultMid(node: OrgNode, target: OrgNode): { x: number; y: number } {
-    const cx1 = node.freeX + CARD_W / 2;
-    const cy1 = node.freeY + CARD_H / 2;
-    const cx2 = target.freeX + CARD_W / 2;
-    const cy2 = target.freeY + CARD_H / 2;
-    const p1 = clipToRectEdge(cx1, cy1, cx2, cy2, CARD_W, CARD_H);
-    const p2 = clipToRectEdge(cx2, cy2, cx1, cy1, CARD_W, CARD_H);
-    return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+    const anchor = computeCoordAnchors(nodes, nodesById, CARD_W, CARD_H).get(`${node.id}->${target.id}`);
+    if (!anchor) {
+      const cx1 = node.freeX + CARD_W / 2;
+      const cy1 = node.freeY + CARD_H / 2;
+      const cx2 = target.freeX + CARD_W / 2;
+      const cy2 = target.freeY + CARD_H / 2;
+      return { x: (cx1 + cx2) / 2, y: (cy1 + cy2) / 2 };
+    }
+    return { x: (anchor.p1.x + anchor.p2.x) / 2, y: (anchor.p1.y + anchor.p2.y) / 2 };
   }
 
   function handleLinePointerDown(e: React.PointerEvent, nodeId: string, midX: number, midY: number) {
@@ -420,6 +518,8 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     );
   }
 
+  const coordAnchors = computeCoordAnchors(nodes, nodesById, CARD_W, CARD_H);
+
   return (
     <div
       ref={setRootRef}
@@ -448,13 +548,9 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
         {nodes.flatMap((node) =>
           (node.coordinationLinks || []).map((link) => {
             const target = nodesById.get(link.targetId);
-            if (!target) return null;
-            const cx1 = node.freeX + CARD_W / 2;
-            const cy1 = node.freeY + CARD_H / 2;
-            const cx2 = target.freeX + CARD_W / 2;
-            const cy2 = target.freeY + CARD_H / 2;
-            const p1 = clipToRectEdge(cx1, cy1, cx2, cy2, CARD_W, CARD_H);
-            const p2 = clipToRectEdge(cx2, cy2, cx1, cy1, CARD_W, CARD_H);
+            const anchor = coordAnchors.get(`${node.id}->${link.targetId}`);
+            if (!target || !anchor) return null;
+            const { p1, p2 } = anchor;
             const midX = (p1.x + p2.x) / 2 + (link.offsetX ?? 0);
             const midY = (p1.y + p2.y) / 2 + (link.offsetY ?? 0);
             return (
@@ -574,13 +670,9 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
           {nodes.flatMap((node) =>
             (node.coordinationLinks || []).map((link) => {
               const target = nodesById.get(link.targetId);
-              if (!target) return null;
-              const cx1 = node.freeX + CARD_W / 2;
-              const cy1 = node.freeY + CARD_H / 2;
-              const cx2 = target.freeX + CARD_W / 2;
-              const cy2 = target.freeY + CARD_H / 2;
-              const p1 = clipToRectEdge(cx1, cy1, cx2, cy2, CARD_W, CARD_H);
-              const p2 = clipToRectEdge(cx2, cy2, cx1, cy1, CARD_W, CARD_H);
+              const anchor = coordAnchors.get(`${node.id}->${link.targetId}`);
+              if (!target || !anchor) return null;
+              const { p1, p2 } = anchor;
               const midX = (p1.x + p2.x) / 2 + (link.offsetX ?? 0);
               const midY = (p1.y + p2.y) / 2 + (link.offsetY ?? 0);
               return (

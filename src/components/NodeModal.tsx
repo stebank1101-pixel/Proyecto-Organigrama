@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2, Upload, X } from "lucide-react";
 import { useT } from "../lib/i18n";
-import { ICON_LABELS, ICON_NAMES, OrgIcon } from "../lib/icons";
+import { ICON_NAMES, OrgIcon } from "../lib/icons";
 import { CARD_COLOR_PRESETS, FONT_OPTIONS } from "../types";
 import type { Assignee, OrgNode, RoleType } from "../types";
 
@@ -186,7 +186,7 @@ export function NodeModal({ open, initial, defaultParentId, defaultSede, nodes, 
               <select className="input" value={form.iconName} onChange={(e) => update("iconName", e.target.value)}>
                 {ICON_NAMES.map((name) => (
                   <option key={name} value={name}>
-                    {ICON_LABELS[name] || name}
+                    {t.nodeModal.icons[name] || name}
                   </option>
                 ))}
               </select>
