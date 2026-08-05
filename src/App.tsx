@@ -31,6 +31,31 @@ interface Toast {
 // dropping one, and returns the same array reference when nothing changed so callers can
 // skip an extra render. Returns a new array (never the same reference) only when a rename
 // actually happened.
+// The AI generator always numbers a fresh batch starting at "ai-node-1", so appending (or
+// replacing into a chart that keeps other AI-generated sedes) a second batch collides with
+// the first one on nearly every id. The old fix only renamed the colliding node itself —
+// every parentId and coordinationLinks.targetId *inside that same batch* that pointed at
+// the old id was left dangling, which is why a freshly-applied batch could render with zero
+// connecting lines even though the hierarchy was clearly there in the data. This renames
+// collisions AND rewrites every in-batch reference to match.
+function remapCollidingIds(batch: OrgNode[], existingIds: Set<string>): OrgNode[] {
+  const idMap = new Map<string, string>();
+  const renamed = batch.map((n, idx) => {
+    if (!existingIds.has(n.id)) return n;
+    const newId = `${n.id}-${Date.now()}-${idx}`;
+    idMap.set(n.id, newId);
+    return { ...n, id: newId };
+  });
+  if (idMap.size === 0) return renamed;
+  return renamed.map((n) => ({
+    ...n,
+    parentId: n.parentId && idMap.has(n.parentId) ? idMap.get(n.parentId)! : n.parentId,
+    coordinationLinks: (n.coordinationLinks ?? []).map((link) =>
+      idMap.has(link.targetId) ? { ...link, targetId: idMap.get(link.targetId)! } : link
+    ),
+  }));
+}
+
 function dedupeNodeIds(nodes: OrgNode[]): OrgNode[] {
   const seen = new Set<string>();
   let hasDuplicate = false;
@@ -206,14 +231,18 @@ export default function App() {
 
   function handleApplyAiNodes(newNodes: OrgNode[], mode: "replace" | "append", targetSede: string) {
     if (mode === "replace") {
-      setNodes((prev) => dedupeNodeIds([...prev.filter((n) => n.sede !== targetSede), ...newNodes]));
+      setNodes((prev) => {
+        const kept = prev.filter((n) => n.sede !== targetSede);
+        const existingIds = new Set(kept.map((n) => n.id));
+        // dedupeNodeIds is still the final safety net (e.g. against a stray id that matches
+        // something outside this remap's view), but remapCollidingIds is what actually keeps
+        // the batch's own hierarchy/coordination lines intact when it has to rename an id.
+        return dedupeNodeIds([...kept, ...remapCollidingIds(newNodes, existingIds)]);
+      });
     } else {
       setNodes((prev) => {
         const existingIds = new Set(prev.map((n) => n.id));
-        const remapped = newNodes.map((n) => (existingIds.has(n.id) ? { ...n, id: `${n.id}-${Date.now()}` } : n));
-        // dedupeNodeIds also catches collisions WITHIN newNodes itself (e.g. the AI
-        // repeating an id across its own batch), which the existingIds check above can't see.
-        return dedupeNodeIds([...prev, ...remapped]);
+        return dedupeNodeIds([...prev, ...remapCollidingIds(newNodes, existingIds)]);
       });
     }
     setDirty(true);
