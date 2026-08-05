@@ -128,17 +128,40 @@ async function loadNodes(): Promise<any[]> {
   return data.map((row) => row.data);
 }
 
+// IMPORTANT: this used to delete every row and then re-insert the incoming set. If the
+// insert failed for any reason (e.g. a duplicate id in the payload tripping the primary
+// key constraint), the delete had already committed — leaving the table empty with no way
+// back. Now it upserts first and only removes rows for nodes that are genuinely gone
+// (diffed against what's still in the table), so a failed save never touches existing data.
 async function saveNodes(nodes: any[]): Promise<void> {
   if (!supabase) {
     inMemoryNodes = nodes;
     return;
   }
-  const { error: deleteError } = await supabase.from("org_nodes").delete().not("id", "is", null);
-  if (deleteError) throw new Error(deleteError.message);
+
   if (nodes.length > 0) {
     const rows = nodes.map((n) => ({ id: n.id, data: n }));
-    const { error: insertError } = await supabase.from("org_nodes").insert(rows);
-    if (insertError) throw new Error(insertError.message);
+    const { error: upsertError } = await supabase.from("org_nodes").upsert(rows, { onConflict: "id" });
+    if (upsertError) throw new Error(upsertError.message);
+  }
+
+  const { data: existing, error: listError } = await supabase.from("org_nodes").select("id");
+  if (listError) throw new Error(listError.message);
+  const incomingIds = new Set(nodes.map((n) => n.id));
+  const idsToRemove = (existing || []).map((row: any) => row.id as string).filter((id: string) => !incomingIds.has(id));
+
+  // Saving zero nodes while the table already holds a meaningful amount of data is almost
+  // certainly a bug (a race, a bad client state) rather than someone intentionally deleting
+  // their entire org chart — refuse it rather than silently wiping everything.
+  if (nodes.length === 0 && idsToRemove.length > 5) {
+    throw new Error(
+      `Se intentó guardar un organigrama vacío mientras la base de datos aún tenía ${idsToRemove.length} nodos guardados. Por seguridad, no se eliminó nada — recarga la página e inténtalo de nuevo.`
+    );
+  }
+
+  if (idsToRemove.length > 0) {
+    const { error: deleteError } = await supabase.from("org_nodes").delete().in("id", idsToRemove);
+    if (deleteError) throw new Error(deleteError.message);
   }
 }
 
@@ -963,9 +986,20 @@ ${image ? "Recuerda: el array \"nodes\" debe incluir absolutamente todas las caj
     const parsed = JSON.parse(text);
 
     if (parsed && Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
+      // A long list of similarly-named ids ("ai-node-1", "ai-node-2"...) is exactly the
+      // kind of output where a model can repeat a number — a duplicate id here would later
+      // crash the save (org_nodes.id is a primary key), so it's fixed at the source rather
+      // than trusted through.
+      const seenIds = new Set<string>();
+      const dedupedNodes = parsed.nodes.map((node: any, idx: number) => {
+        if (seenIds.has(node.id)) return { ...node, id: `${node.id}-dup${idx}` };
+        seenIds.add(node.id);
+        return node;
+      });
+
       // `sede` is force-stamped server-side rather than trusted from the model's output.
-      const positions = layoutAiNodes(parsed.nodes.map((n: any) => ({ id: n.id, parentId: n.parentId ?? null })));
-      const nodesWithCoords = parsed.nodes.map((node: any) => {
+      const positions = layoutAiNodes(dedupedNodes.map((n: any) => ({ id: n.id, parentId: n.parentId ?? null })));
+      const nodesWithCoords = dedupedNodes.map((node: any) => {
         const pos = positions.get(node.id) || { x: 0, y: 0 };
         return {
           ...node,

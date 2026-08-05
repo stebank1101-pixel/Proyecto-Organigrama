@@ -25,6 +25,32 @@ interface Toast {
   tone: "success" | "error";
 }
 
+// org_nodes.id is a database primary key, so two nodes sharing an id can never both be
+// saved — most likely source is an AI-generated batch repeating an id (e.g. two
+// "ai-node-12"s). Renaming the later duplicate keeps every node instead of silently
+// dropping one, and returns the same array reference when nothing changed so callers can
+// skip an extra render. Returns a new array (never the same reference) only when a rename
+// actually happened.
+function dedupeNodeIds(nodes: OrgNode[]): OrgNode[] {
+  const seen = new Set<string>();
+  let hasDuplicate = false;
+  for (const n of nodes) {
+    if (seen.has(n.id)) {
+      hasDuplicate = true;
+      break;
+    }
+    seen.add(n.id);
+  }
+  if (!hasDuplicate) return nodes;
+
+  seen.clear();
+  return nodes.map((n, idx) => {
+    if (seen.has(n.id)) return { ...n, id: `${n.id}-dup${idx}` };
+    seen.add(n.id);
+    return n;
+  });
+}
+
 export default function App() {
   const { user, loading: authLoading, isAdmin, isGuest } = useAuth();
   const t = useT();
@@ -180,12 +206,14 @@ export default function App() {
 
   function handleApplyAiNodes(newNodes: OrgNode[], mode: "replace" | "append", targetSede: string) {
     if (mode === "replace") {
-      setNodes((prev) => [...prev.filter((n) => n.sede !== targetSede), ...newNodes]);
+      setNodes((prev) => dedupeNodeIds([...prev.filter((n) => n.sede !== targetSede), ...newNodes]));
     } else {
       setNodes((prev) => {
         const existingIds = new Set(prev.map((n) => n.id));
         const remapped = newNodes.map((n) => (existingIds.has(n.id) ? { ...n, id: `${n.id}-${Date.now()}` } : n));
-        return [...prev, ...remapped];
+        // dedupeNodeIds also catches collisions WITHIN newNodes itself (e.g. the AI
+        // repeating an id across its own batch), which the existingIds check above can't see.
+        return dedupeNodeIds([...prev, ...remapped]);
       });
     }
     setDirty(true);
@@ -196,7 +224,12 @@ export default function App() {
   async function handleSave() {
     setSaving(true);
     try {
-      await bulkSyncNodes(nodes);
+      // Last-resort safety net: never hand the server a set of nodes with a duplicate id —
+      // org_nodes.id is a primary key, and a save that fails partway through used to leave
+      // real data deleted (see saveNodes on the server, now fixed too, for the full story).
+      const deduped = dedupeNodeIds(nodes);
+      await bulkSyncNodes(deduped);
+      if (deduped !== nodes) setNodes(deduped);
       setDirty(false);
       pushToast(t.app.orgSynced);
     } catch (err) {
