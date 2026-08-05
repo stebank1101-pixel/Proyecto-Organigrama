@@ -188,6 +188,7 @@ export function OrgChartView({
 
   const allSedes = useMemo(() => computeAllSedes(nodes, workCenters), [nodes, workCenters]);
   const workCenterRows = useMemo(() => computeWorkCenterRows(nodes, workCenters), [nodes, workCenters]);
+  const activeCenterProfile = activeCenter ? workCenters.find((c) => c.name === activeCenter) : undefined;
 
   const centerNodes = useMemo(
     () => (activeCenter ? nodes.filter((n) => n.sede === activeCenter) : []),
@@ -439,6 +440,7 @@ export function OrgChartView({
                   allSedes={allSedes}
                   compact={compact}
                   onNavigateToSede={handleNavigateToSede}
+                  workCenters={workCenters}
                 />
               ) : (
                 <TreeView
@@ -450,6 +452,9 @@ export function OrgChartView({
                   onRemoveBoss={readOnly ? undefined : (node) => onLineDelete(node.id)}
                   onNodeMove={onMoveNode}
                   onNavigateToSede={handleNavigateToSede}
+                  logo={activeCenterProfile?.logo}
+                  canvasBackgroundColor={activeCenterProfile?.backgroundColor}
+                  canvasBackgroundImage={activeCenterProfile?.backgroundImage}
                   readOnly={readOnly}
                   compact={compact}
                   linkMode={linkMode}

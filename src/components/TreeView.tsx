@@ -161,6 +161,12 @@ interface TreeViewProps {
   /** While on, dragging a card draws a coordination line to whatever it's released on,
    * instead of moving/reparenting it (Shift+drag also works regardless of this toggle). */
   linkMode?: boolean;
+  /** Center branding, rendered directly on the canvas (not just around it) so exports —
+   * which snapshot this same root element — pick it up too. backgroundImage tiles rather
+   * than stretching, so it holds up as the canvas grows with more nodes. */
+  logo?: string;
+  canvasBackgroundColor?: string;
+  canvasBackgroundImage?: string;
 }
 
 export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeView(
@@ -184,6 +190,9 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     readOnly,
     compact,
     linkMode,
+    logo,
+    canvasBackgroundColor,
+    canvasBackgroundImage,
   },
   forwardedRef
 ) {
@@ -562,11 +571,17 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     <div
       ref={setRootRef}
       className="relative"
-      style={{ width: bounds.width, height: bounds.height }}
+      style={{
+        width: bounds.width,
+        height: bounds.height,
+        ...(canvasBackgroundColor ? { backgroundColor: canvasBackgroundColor } : {}),
+        ...(canvasBackgroundImage ? { backgroundImage: `url(${canvasBackgroundImage})`, backgroundRepeat: "repeat" } : {}),
+      }}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
+      {logo && <img src={logo} alt="" className="pointer-events-none absolute left-6 top-6 max-h-16 max-w-[200px] object-contain" />}
       <svg className="pointer-events-none absolute inset-0" width={bounds.width} height={bounds.height}>
         {nodes.map((node) => {
           if (!node.parentId) return null;

@@ -2,7 +2,7 @@ import { Building2 } from "lucide-react";
 import { forwardRef } from "react";
 import { useT } from "../lib/i18n";
 import { groupNodesBySede } from "../lib/workCenters";
-import type { OrgNode } from "../types";
+import type { OrgNode, WorkCenter } from "../types";
 import { TreeView } from "./TreeView";
 
 interface AllCentersOverviewProps {
@@ -10,12 +10,13 @@ interface AllCentersOverviewProps {
   allSedes: string[];
   compact?: boolean;
   onNavigateToSede?: (sede: string) => void;
+  workCenters?: WorkCenter[];
 }
 
 function noop() {}
 
 export const AllCentersOverview = forwardRef<HTMLDivElement, AllCentersOverviewProps>(function AllCentersOverview(
-  { nodes, allSedes, compact, onNavigateToSede },
+  { nodes, allSedes, compact, onNavigateToSede, workCenters },
   ref
 ) {
   const t = useT();
@@ -43,6 +44,9 @@ export const AllCentersOverview = forwardRef<HTMLDivElement, AllCentersOverviewP
                 onAddChild={noop}
                 onNodeMove={noop}
                 onNavigateToSede={onNavigateToSede}
+                logo={workCenters?.find((c) => c.name === group.sede)?.logo}
+                canvasBackgroundColor={workCenters?.find((c) => c.name === group.sede)?.backgroundColor}
+                canvasBackgroundImage={workCenters?.find((c) => c.name === group.sede)?.backgroundImage}
                 readOnly
                 compact={compact}
               />

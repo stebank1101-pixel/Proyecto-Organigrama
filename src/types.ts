@@ -24,6 +24,13 @@ export interface WorkCenter {
   /** The one work center (at most) that opens automatically when the Organigrama tab
    * loads, instead of the "Centros de trabajo" picker screen. */
   isDefault?: boolean;
+  /** Shown on this center's own org chart canvas (and in its exports), separate from the
+   * small `icon` used for picker/manager cards. */
+  logo?: string;
+  /** Custom canvas background for this center's org chart. backgroundImage tiles (repeats)
+   * rather than stretching, so it stays a clean corporate pattern at any canvas size. */
+  backgroundColor?: string;
+  backgroundImage?: string;
 }
 
 export interface OrgNode {

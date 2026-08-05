@@ -11,6 +11,9 @@ interface ProfileDraft {
   headcount: string;
   budget: string;
   icon: string;
+  logo: string;
+  backgroundColor: string;
+  backgroundImage: string;
 }
 
 interface WorkCenterManagerModalProps {
@@ -25,7 +28,17 @@ interface WorkCenterManagerModalProps {
   onDelete: (name: string) => void;
   onUpdateProfile: (
     name: string,
-    profile: { address: string; email: string; phone: string; headcount: number; budget: string; icon: string }
+    profile: {
+      address: string;
+      email: string;
+      phone: string;
+      headcount: number;
+      budget: string;
+      icon: string;
+      logo: string;
+      backgroundColor: string;
+      backgroundImage: string;
+    }
   ) => void;
   onSetDefault: (name: string, isDefault: boolean) => void;
   onEditNode: (node: OrgNode) => void;
@@ -56,6 +69,8 @@ export function WorkCenterManagerModal({
   const [expandedName, setExpandedName] = useState<string | null>(null);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const backgroundInputRef = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
 
@@ -63,6 +78,20 @@ export function WorkCenterManagerModal({
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => setProfileDraft((d) => (d ? { ...d, icon: reader.result as string } : d));
+    reader.readAsDataURL(file);
+  }
+
+  function handleLogoFile(file: File | undefined) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setProfileDraft((d) => (d ? { ...d, logo: reader.result as string } : d));
+    reader.readAsDataURL(file);
+  }
+
+  function handleBackgroundFile(file: File | undefined) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setProfileDraft((d) => (d ? { ...d, backgroundImage: reader.result as string } : d));
     reader.readAsDataURL(file);
   }
 
@@ -102,6 +131,9 @@ export function WorkCenterManagerModal({
       headcount: c.headcount ? String(c.headcount) : "",
       budget: c.budget,
       icon: c.icon,
+      logo: c.logo,
+      backgroundColor: c.backgroundColor,
+      backgroundImage: c.backgroundImage,
     });
   }
 
@@ -114,6 +146,9 @@ export function WorkCenterManagerModal({
       headcount: Number(profileDraft.headcount) || 0,
       budget: profileDraft.budget,
       icon: profileDraft.icon,
+      logo: profileDraft.logo,
+      backgroundColor: profileDraft.backgroundColor,
+      backgroundImage: profileDraft.backgroundImage,
     });
   }
 
@@ -306,6 +341,115 @@ export function WorkCenterManagerModal({
                           onChange={(e) => setProfileDraft((d) => (d ? { ...d, budget: e.target.value } : d))}
                         />
                       </div>
+
+                      <div className="mt-3 border-t border-slate-200 pt-3">
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {t.workCenterManager.brandingTitle}
+                        </p>
+
+                        <div className="mb-2 flex items-center gap-2">
+                          <div className="flex h-10 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white">
+                            {profileDraft?.logo ? (
+                              <img src={profileDraft.logo} alt="" className="h-full w-full object-contain" />
+                            ) : (
+                              <span className="text-[9px] text-slate-300">{t.workCenterManager.noLogo}</span>
+                            )}
+                          </div>
+                          {!readOnly && (
+                            <>
+                              <input
+                                className="input flex-1"
+                                placeholder={t.workCenterManager.logoUrlPlaceholder}
+                                value={profileDraft?.logo ?? ""}
+                                onChange={(e) => setProfileDraft((d) => (d ? { ...d, logo: e.target.value } : d))}
+                              />
+                              <input
+                                ref={logoInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => handleLogoFile(e.target.files?.[0])}
+                              />
+                              <button
+                                type="button"
+                                className="icon-btn flex-shrink-0 border border-slate-200"
+                                title={t.workCenterManager.uploadFromPc}
+                                onClick={() => logoInputRef.current?.click()}
+                              >
+                                <Upload className="h-3.5 w-3.5" />
+                              </button>
+                              {profileDraft?.logo && (
+                                <button
+                                  type="button"
+                                  className="flex-shrink-0 text-[11px] text-rose-500 hover:underline"
+                                  onClick={() => setProfileDraft((d) => (d ? { ...d, logo: "" } : d))}
+                                >
+                                  {t.workCenterManager.remove}
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+
+                        <div className="mb-2 flex items-center gap-2">
+                          <input
+                            type="color"
+                            className="h-8 w-10 flex-shrink-0 cursor-pointer rounded border border-slate-200 bg-white p-0.5 disabled:cursor-not-allowed"
+                            disabled={readOnly}
+                            value={profileDraft?.backgroundColor || "#ffffff"}
+                            onChange={(e) => setProfileDraft((d) => (d ? { ...d, backgroundColor: e.target.value } : d))}
+                          />
+                          <span className="text-[11px] text-slate-500">{t.workCenterManager.backgroundColorLabel}</span>
+                          {!readOnly && profileDraft?.backgroundColor && (
+                            <button
+                              type="button"
+                              className="text-[11px] text-sky-600 hover:underline"
+                              onClick={() => setProfileDraft((d) => (d ? { ...d, backgroundColor: "" } : d))}
+                            >
+                              {t.nodeModal.reset}
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <input
+                            className="input flex-1"
+                            placeholder={t.workCenterManager.backgroundImagePlaceholder}
+                            disabled={readOnly}
+                            value={profileDraft?.backgroundImage ?? ""}
+                            onChange={(e) => setProfileDraft((d) => (d ? { ...d, backgroundImage: e.target.value } : d))}
+                          />
+                          {!readOnly && (
+                            <>
+                              <input
+                                ref={backgroundInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => handleBackgroundFile(e.target.files?.[0])}
+                              />
+                              <button
+                                type="button"
+                                className="icon-btn flex-shrink-0 border border-slate-200"
+                                title={t.workCenterManager.uploadFromPc}
+                                onClick={() => backgroundInputRef.current?.click()}
+                              >
+                                <Upload className="h-3.5 w-3.5" />
+                              </button>
+                              {profileDraft?.backgroundImage && (
+                                <button
+                                  type="button"
+                                  className="flex-shrink-0 text-[11px] text-rose-500 hover:underline"
+                                  onClick={() => setProfileDraft((d) => (d ? { ...d, backgroundImage: "" } : d))}
+                                >
+                                  {t.workCenterManager.remove}
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+
                       {!readOnly && (
                         <button className="btn-secondary mt-2" onClick={() => saveProfile(c.name)}>
                           {t.workCenterManager.saveProfile}

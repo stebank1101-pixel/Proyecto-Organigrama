@@ -12,6 +12,9 @@ export interface WorkCenterRow {
   budget: string;
   icon: string;
   isDefault: boolean;
+  logo: string;
+  backgroundColor: string;
+  backgroundImage: string;
 }
 
 export interface SedeGroup {
@@ -50,6 +53,9 @@ export function computeWorkCenterRows(nodes: OrgNode[], workCenters: WorkCenter[
       budget: profile?.budget ?? "",
       icon: profile?.icon ?? "",
       isDefault: profile?.isDefault ?? false,
+      logo: profile?.logo ?? "",
+      backgroundColor: profile?.backgroundColor ?? "",
+      backgroundImage: profile?.backgroundImage ?? "",
     };
   });
 }

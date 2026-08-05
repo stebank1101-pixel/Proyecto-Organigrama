@@ -155,11 +155,35 @@ interface WorkCenterRecord {
   budget: string;
   icon: string;
   isDefault: boolean;
+  logo: string;
+  backgroundColor: string;
+  backgroundImage: string;
 }
 
 function blankCenter(name: string): WorkCenterRecord {
-  return { name, address: "", email: "", phone: "", headcount: 0, budget: "", icon: "", isDefault: false };
+  return {
+    name,
+    address: "",
+    email: "",
+    phone: "",
+    headcount: 0,
+    budget: "",
+    icon: "",
+    isDefault: false,
+    logo: "",
+    backgroundColor: "",
+    backgroundImage: ""
+  };
 }
+
+// updateWorkCenterProfile forwards profile keys straight through to Supabase as column
+// names; most already match (address, email, icon...) but a few multi-word fields use
+// snake_case columns, so those need translating before they reach the query.
+const CAMEL_TO_SNAKE_COLUMNS: Record<string, string> = {
+  isDefault: "is_default",
+  backgroundColor: "background_color",
+  backgroundImage: "background_image"
+};
 
 let inMemoryWorkCenters: WorkCenterRecord[] = [];
 
@@ -175,7 +199,10 @@ async function loadWorkCenters(): Promise<WorkCenterRecord[]> {
     headcount: row.headcount || 0,
     budget: row.budget || "",
     icon: row.icon || "",
-    isDefault: row.is_default || false
+    isDefault: row.is_default || false,
+    logo: row.logo || "",
+    backgroundColor: row.background_color || "",
+    backgroundImage: row.background_image || ""
   }));
 }
 
@@ -213,7 +240,11 @@ async function updateWorkCenterProfile(name: string, profile: Partial<Omit<WorkC
     else inMemoryWorkCenters[idx] = { ...inMemoryWorkCenters[idx], ...profile };
     return;
   }
-  const { error } = await supabase.from("work_centers").upsert({ name, ...profile }, { onConflict: "name" });
+  const dbProfile: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(profile)) {
+    dbProfile[CAMEL_TO_SNAKE_COLUMNS[key] ?? key] = value;
+  }
+  const { error } = await supabase.from("work_centers").upsert({ name, ...dbProfile }, { onConflict: "name" });
   if (error) throw new Error(error.message);
 }
 
@@ -230,8 +261,7 @@ async function setDefaultWorkCenter(name: string, isDefault: boolean): Promise<v
     const { error: clearError } = await supabase.from("work_centers").update({ is_default: false }).neq("name", name);
     if (clearError) throw new Error(clearError.message);
   }
-  const { error } = await supabase.from("work_centers").upsert({ name, is_default: isDefault }, { onConflict: "name" });
-  if (error) throw new Error(error.message);
+  await updateWorkCenterProfile(name, { isDefault });
 }
 
 // User profiles (auth), sessions, integration API keys and sync logs persist in Supabase
@@ -648,7 +678,7 @@ app.put("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
 
 app.patch("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
   const name = decodeURIComponent(req.params.name);
-  const { address, email, phone, headcount, budget, icon, isDefault } = req.body || {};
+  const { address, email, phone, headcount, budget, icon, isDefault, logo, backgroundColor, backgroundImage } = req.body || {};
   try {
     await updateWorkCenterProfile(name, {
       ...(address !== undefined ? { address } : {}),
@@ -656,7 +686,10 @@ app.patch("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
       ...(phone !== undefined ? { phone } : {}),
       ...(headcount !== undefined ? { headcount: Number(headcount) || 0 } : {}),
       ...(budget !== undefined ? { budget } : {}),
-      ...(icon !== undefined ? { icon } : {})
+      ...(icon !== undefined ? { icon } : {}),
+      ...(logo !== undefined ? { logo } : {}),
+      ...(backgroundColor !== undefined ? { backgroundColor } : {}),
+      ...(backgroundImage !== undefined ? { backgroundImage } : {})
     });
     if (isDefault !== undefined) {
       await setDefaultWorkCenter(name, !!isDefault);

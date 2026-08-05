@@ -41,6 +41,9 @@ alter table public.work_centers add column if not exists headcount integer not n
 alter table public.work_centers add column if not exists budget text not null default '';
 alter table public.work_centers add column if not exists icon text;
 alter table public.work_centers add column if not exists is_default boolean not null default false;
+alter table public.work_centers add column if not exists logo text;
+alter table public.work_centers add column if not exists background_color text;
+alter table public.work_centers add column if not exists background_image text;
 alter table public.work_centers disable row level security;
 
 -- ============================================================

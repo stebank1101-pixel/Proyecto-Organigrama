@@ -283,6 +283,11 @@ export const es = {
     isDefaultBadge: "Este organigrama se abre automáticamente al entrar",
     setDefault: "Usar como organigrama inicial",
     unsetDefault: "Quitar como organigrama inicial",
+    brandingTitle: "Logo y fondo del organigrama",
+    noLogo: "Sin logo",
+    logoUrlPlaceholder: "URL del logo (https://...)",
+    backgroundColorLabel: "Color de fondo del lienzo",
+    backgroundImagePlaceholder: "Imagen de fondo (https://... — se repite en mosaico)",
   },
   workCenterPicker: {
     title: "Centros de trabajo",

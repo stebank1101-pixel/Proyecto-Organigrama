@@ -285,6 +285,11 @@ export const en: Dictionary = {
     isDefaultBadge: "This org chart opens automatically on load",
     setDefault: "Use as the home org chart",
     unsetDefault: "Remove as the home org chart",
+    brandingTitle: "Org chart logo and background",
+    noLogo: "No logo",
+    logoUrlPlaceholder: "Logo URL (https://...)",
+    backgroundColorLabel: "Canvas background color",
+    backgroundImagePlaceholder: "Background image (https://... — tiles as a repeating pattern)",
   },
   workCenterPicker: {
     title: "Work centers",
