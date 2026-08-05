@@ -114,11 +114,12 @@ export const en: Dictionary = {
     active: "Active",
     inactive: "Inactive",
     untitledRole: "Untitled role",
-    unassignedDepartment: "Unassigned area",
     addSubordinate: "Add subordinate",
     edit: "Edit",
     removeBoss: "Remove direct manager (leaves the node without a manager)",
     delete: "Delete",
+    goToCenter: (sede) => `Go to ${sede}`,
+    openOrgChart: (sede) => `Open ${sede}'s org chart`,
   },
   nodeModal: {
     editRole: "Edit role",
@@ -162,6 +163,12 @@ export const en: Dictionary = {
     active: "Active",
     inactive: "Inactive",
     badge: "Badge",
+    borderColor: "Border color",
+    linkSectionTitle: "Link to another work center",
+    linkSectionHint:
+      "Turns this role into a shortcut: clicking it opens the chosen center's org chart instead of showing this person's data.",
+    linkNoneOption: "— Not a link —",
+    linkTargetLabel: "Target center",
     cancel: "Cancel",
     save: "Save",
     icons: {

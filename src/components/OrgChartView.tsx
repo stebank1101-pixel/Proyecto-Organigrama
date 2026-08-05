@@ -231,6 +231,12 @@ export function OrgChartView({
     if (ok && selectedCenter === name) setSelectedCenter(null);
   }
 
+  // Following a hub-link card just switches which center is showing — works for
+  // read-only guests too, since it's navigation rather than an edit.
+  function handleNavigateToSede(sede: string) {
+    setSelectedCenter(sede);
+  }
+
   async function exportAs(format: "png" | "svg" | "pdf") {
     const node = contentRef.current;
     if (!node) return;
@@ -409,7 +415,13 @@ export function OrgChartView({
           >
             <div style={{ padding: PAN_PADDING }} className="inline-block min-w-full">
               {selectedCenter === "ALL" ? (
-                <AllCentersOverview ref={contentRef} nodes={nodes} allSedes={allSedes} compact={compact} />
+                <AllCentersOverview
+                  ref={contentRef}
+                  nodes={nodes}
+                  allSedes={allSedes}
+                  compact={compact}
+                  onNavigateToSede={handleNavigateToSede}
+                />
               ) : (
                 <TreeView
                   ref={contentRef}
@@ -419,6 +431,7 @@ export function OrgChartView({
                   onAddChild={(p) => openCreate(p.id)}
                   onRemoveBoss={readOnly ? undefined : (node) => onLineDelete(node.id)}
                   onNodeMove={onMoveNode}
+                  onNavigateToSede={handleNavigateToSede}
                   readOnly={readOnly}
                   compact={compact}
                   linkMode={linkMode}

@@ -9,12 +9,13 @@ interface AllCentersOverviewProps {
   nodes: OrgNode[];
   allSedes: string[];
   compact?: boolean;
+  onNavigateToSede?: (sede: string) => void;
 }
 
 function noop() {}
 
 export const AllCentersOverview = forwardRef<HTMLDivElement, AllCentersOverviewProps>(function AllCentersOverview(
-  { nodes, allSedes, compact },
+  { nodes, allSedes, compact, onNavigateToSede },
   ref
 ) {
   const t = useT();
@@ -35,7 +36,16 @@ export const AllCentersOverview = forwardRef<HTMLDivElement, AllCentersOverviewP
             <p className="text-xs text-slate-400">{t.allCenters.noCollaborators}</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-slate-100 bg-slate-50/50">
-              <TreeView nodes={group.nodes} onEdit={noop} onDelete={noop} onAddChild={noop} onNodeMove={noop} readOnly compact={compact} />
+              <TreeView
+                nodes={group.nodes}
+                onEdit={noop}
+                onDelete={noop}
+                onAddChild={noop}
+                onNodeMove={noop}
+                onNavigateToSede={onNavigateToSede}
+                readOnly
+                compact={compact}
+              />
             </div>
           )}
         </div>

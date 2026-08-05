@@ -56,6 +56,11 @@ export interface OrgNode {
    * solid/dashed style (same convention as the reference org chart's line legend) and can
    * be bent by dragging its midpoint — offsetX/Y from the automatic midpoint. */
   coordinationLinks?: { targetId: string; style: "solid" | "dashed"; offsetX?: number; offsetY?: number }[];
+  /** When set, this node acts as a shortcut into another work center's chart: clicking its
+   * card (a plain click, not a drag) navigates there instead of showing its own data. Lets
+   * one "hub" org chart link out to every other center without touching how normal nodes
+   * behave — existing nodes simply never set this field. */
+  linkTargetSede?: string;
 }
 
 export interface FontOption {

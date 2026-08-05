@@ -160,6 +160,25 @@ export function NodeModal({ open, initial, defaultParentId, defaultSede, nodes, 
             </Field>
           </div>
 
+          <div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3">
+            <p className="text-xs font-semibold text-slate-700">{t.nodeModal.linkSectionTitle}</p>
+            <p className="mb-2 mt-0.5 text-[11px] text-slate-500">{t.nodeModal.linkSectionHint}</p>
+            <Field label={t.nodeModal.linkTargetLabel}>
+              <select
+                className="input"
+                value={form.linkTargetSede ?? ""}
+                onChange={(e) => update("linkTargetSede", e.target.value || undefined)}
+              >
+                <option value="">{t.nodeModal.linkNoneOption}</option>
+                {(sedeOptions ?? []).map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <Field label={t.nodeModal.email}>
               <input type="email" className="input" value={form.email} onChange={(e) => update("email", e.target.value)} />
@@ -196,7 +215,7 @@ export function NodeModal({ open, initial, defaultParentId, defaultSede, nodes, 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <p className="mb-2 text-xs font-semibold text-slate-700">{t.nodeModal.cardAppearance}</p>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <Field label={t.nodeModal.bgColor}>
                 <div className="flex items-center gap-2">
                   <input
@@ -228,6 +247,19 @@ export function NodeModal({ open, initial, defaultParentId, defaultSede, nodes, 
                     onChange={(e) => update("textColor", e.target.value)}
                   />
                   <button type="button" className="text-[11px] text-sky-600 hover:underline" onClick={() => update("textColor", "")}>
+                    {t.nodeModal.reset}
+                  </button>
+                </div>
+              </Field>
+              <Field label={t.nodeModal.borderColor}>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-white p-0.5"
+                    value={form.borderColor || "#e2e8f0"}
+                    onChange={(e) => update("borderColor", e.target.value)}
+                  />
+                  <button type="button" className="text-[11px] text-sky-600 hover:underline" onClick={() => update("borderColor", "")}>
                     {t.nodeModal.reset}
                   </button>
                 </div>

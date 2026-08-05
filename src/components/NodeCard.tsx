@@ -1,4 +1,4 @@
-import { Pencil, Plus, Trash2, Unlink } from "lucide-react";
+import { ExternalLink, Pencil, Plus, Trash2, Unlink } from "lucide-react";
 import { getDepartmentStyle } from "../lib/departmentColors";
 import { useT } from "../lib/i18n";
 import { OrgIcon } from "../lib/icons";
@@ -20,29 +20,37 @@ interface NodeCardProps {
 
 export function NodeCard({ node, onEdit, onDelete, onAddChild, onRemoveBoss, dragHandleProps, highlighted, readOnly, compact }: NodeCardProps) {
   const t = useT();
+  const isLink = !!node.linkTargetSede;
   const style = getDepartmentStyle(node.department);
   const textStyle: React.CSSProperties | undefined = node.textColor ? { color: node.textColor } : undefined;
   const mutedTextStyle: React.CSSProperties | undefined = node.textColor ? { color: node.textColor, opacity: 0.75 } : undefined;
   const cardStyle: React.CSSProperties = {
     ...(node.cardColor ? { backgroundColor: node.cardColor } : {}),
     ...(node.fontFamily ? { fontFamily: node.fontFamily } : {}),
+    ...(node.borderColor ? { borderColor: node.borderColor, ["--tw-ring-color" as string]: node.borderColor } : {}),
   };
+  // A department line with nothing to show would otherwise render as an empty row —
+  // only the secondary lines that actually have content take up space.
+  const secondaryParts = [node.department, node.sede].filter(Boolean);
 
   return (
     <div
       {...dragHandleProps}
       data-card="true"
       style={cardStyle}
-      className={`group relative w-[240px] select-none rounded-xl border bg-white p-3 shadow-md transition-shadow ${style.ring} ${
-        highlighted ? "ring-2 shadow-[0_0_0_3px_rgba(56,189,248,0.25)]" : "ring-1"
-      }`}
+      className={`group relative w-[240px] select-none rounded-xl border bg-white p-3 shadow-md transition-shadow ${
+        isLink ? "border-dashed border-sky-300 ring-sky-300" : style.ring
+      } ${highlighted ? "ring-2 shadow-[0_0_0_3px_rgba(56,189,248,0.25)]" : "ring-1"} ${isLink ? "cursor-pointer hover:bg-sky-50/60" : ""}`}
+      title={isLink ? t.nodeCard.openOrgChart(node.linkTargetSede!) : undefined}
     >
       <div
         className={`absolute -top-2.5 -left-2.5 flex h-7 w-7 items-center justify-center overflow-hidden rounded-full text-white shadow ${
-          node.customIcon ? "bg-white ring-1 ring-slate-200" : style.iconBg
+          isLink ? "bg-sky-500" : node.customIcon ? "bg-white ring-1 ring-slate-200" : style.iconBg
         }`}
       >
-        {node.customIcon ? (
+        {isLink ? (
+          <ExternalLink className="h-3.5 w-3.5" />
+        ) : node.customIcon ? (
           <img src={node.customIcon} alt="" className="h-full w-full object-cover" />
         ) : (
           <OrgIcon name={node.iconName} className="h-3.5 w-3.5" />
@@ -55,17 +63,29 @@ export function NodeCard({ node, onEdit, onDelete, onAddChild, onRemoveBoss, dra
       />
 
       <div className="pt-1">
-        <p className="truncate text-sm font-semibold text-slate-900" style={textStyle} title={node.title}>
+        <p className="break-words text-sm font-semibold text-slate-900" style={textStyle} title={node.title}>
           {node.title || t.nodeCard.untitledRole}
         </p>
-        <p className="truncate text-xs text-slate-500" style={mutedTextStyle} title={compact ? node.department : node.name}>
-          {compact ? node.department || t.nodeCard.unassignedDepartment : node.name}
-        </p>
+        {isLink ? (
+          <p className="truncate text-xs font-medium text-sky-600" style={node.textColor ? mutedTextStyle : undefined}>
+            {t.nodeCard.goToCenter(node.linkTargetSede!)}
+          </p>
+        ) : compact ? (
+          node.department && (
+            <p className="truncate text-xs text-slate-500" style={mutedTextStyle} title={node.department}>
+              {node.department}
+            </p>
+          )
+        ) : (
+          <p className="truncate text-xs text-slate-500" style={mutedTextStyle} title={node.name}>
+            {node.name}
+          </p>
+        )}
       </div>
 
-      {!compact && (
-        <p className="mt-2 truncate text-[11px] text-slate-500" style={mutedTextStyle} title={`${node.department} · ${node.sede}`}>
-          {node.department} · {node.sede}
+      {!compact && !isLink && secondaryParts.length > 0 && (
+        <p className="mt-2 truncate text-[11px] text-slate-500" style={mutedTextStyle} title={secondaryParts.join(" · ")}>
+          {secondaryParts.join(" · ")}
         </p>
       )}
 

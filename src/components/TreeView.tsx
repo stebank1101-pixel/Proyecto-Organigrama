@@ -151,6 +151,10 @@ interface TreeViewProps {
   onCoordinationStyleToggle?: (id: string, targetId: string) => void;
   onCoordinationLineAdjust?: (id: string, targetId: string, offsetX: number, offsetY: number) => void;
   onCoordinationUnlink?: (id: string, targetId: string) => void;
+  /** Called when a node with `linkTargetSede` is clicked (not dragged) — hands the target
+   * sede name back up so the caller can switch the visible center. Fires even in read-only
+   * mode, since following a hub link is navigation, not an edit. */
+  onNavigateToSede?: (sede: string) => void;
   highlightedId?: string | null;
   readOnly?: boolean;
   compact?: boolean;
@@ -175,6 +179,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     onCoordinationStyleToggle,
     onCoordinationLineAdjust,
     onCoordinationUnlink,
+    onNavigateToSede,
     highlightedId,
     readOnly,
     compact,
@@ -184,6 +189,10 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
 ) {
   const t = useT();
   const dragState = useRef<{ id: string; offsetX: number; offsetY: number; blockedIds: Set<string> } | null>(null);
+  // Tracks a pointerdown on a hub-link card so pointerup can tell a genuine click (follow
+  // the link) apart from a drag (reposition the card) — armed independently of the normal
+  // drag state below so it also works in read-only mode, where cards aren't draggable at all.
+  const navClickState = useRef<{ id: string; startX: number; startY: number } | null>(null);
   // grabOffsetX/Y is the pointer's distance from the CURRENT absolute bend point at drag
   // start; each move re-derives a fresh offset-from-default since the connected cards'
   // live positions (and therefore the natural midpoint) can shift frame to frame.
@@ -285,9 +294,17 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
   }
 
   function handlePointerDown(e: React.PointerEvent, node: OrgNode) {
-    if (readOnly) return;
     const target = e.target as HTMLElement;
     if (target.closest("button")) return;
+
+    // Armed before the read-only return below so a hub-link card stays clickable for
+    // viewers — shift/link-mode still take priority since those gestures mean something
+    // else entirely (drawing a coordination line) when they land on a link card.
+    if (node.linkTargetSede && onNavigateToSede && !e.shiftKey && !linkMode) {
+      navClickState.current = { id: node.id, startX: e.clientX, startY: e.clientY };
+    }
+
+    if (readOnly) return;
     e.preventDefault();
     document.body.style.userSelect = "none";
 
@@ -457,8 +474,16 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
     forceRerender((v) => v + 1);
   }
 
-  function handlePointerUp() {
+  function handlePointerUp(e: React.PointerEvent) {
     stopAutoScroll();
+
+    if (navClickState.current) {
+      const click = navClickState.current;
+      navClickState.current = null;
+      const moved = Math.hypot(e.clientX - click.startX, e.clientY - click.startY) >= DRAG_THRESHOLD;
+      const node = !moved ? nodesById.get(click.id) : undefined;
+      if (node?.linkTargetSede) onNavigateToSede?.(node.linkTargetSede);
+    }
 
     if (linkDragState.current) {
       const sourceId = linkDragState.current.id;
