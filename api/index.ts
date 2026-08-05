@@ -962,9 +962,14 @@ REGLAS DE SALIDA OBLIGATORIAS:
 - parentId: id del nodo superior jerárquico dentro de este mismo centro (el director del centro debe tener parentId: null). Cada otro nodo DEBE tener un parentId válido existente en el array!
 - customBadge: distintivo corporativo corto (ej: "Comité Ejecutivo", "Tech Core", "Squad Lead")
 - iconName: nombre de icono lucide (Crown, Cpu, Users, Briefcase, Server, Palette, Globe, Target, Shield, Award)
+- coordinationLinks: array (puede ir vacío []) de objetos { "targetId": "<id de otro nodo>", "style": "dashed" o "solid" } — SOLO para relaciones de coordinación funcional que NO son la línea jerárquica normal (esas van en parentId). Usa esto cuando el organigrama de origen muestre líneas punteadas/discontinuas conectando dos cajas que no son jefe-subordinado directo (ej: un asesor conectado con línea punteada a un gerente, un comité transversal, una coordinación entre dos áreas distintas).
 
 ASEGÚRATE de que el primer nodo sea la máxima autoridad de este centro con parentId: null, y que los directores dependan de él, los managers dependan de directores, etc.
-${image ? "Recuerda: el array \"nodes\" debe incluir absolutamente todas las cajas que aparecen en la imagen adjunta, sin resumir ni truncar la lista." : ""}`;
+${
+  image
+    ? 'Recuerda: el array "nodes" debe incluir absolutamente todas las cajas que aparecen en la imagen adjunta, sin resumir ni truncar la lista. Además, identifica CADA línea punteada o discontinua que conecte dos cajas en la imagen (no las líneas sólidas de jerarquía) y represéntala como un coordinationLink — no las omitas ni las confundas con la jerarquía normal.'
+    : ""
+}`;
 
     const contents = image
       ? [{ role: "user", parts: [{ text: sysPrompt }, { inlineData: { mimeType: image.mimeType, data: image.data } }] }]
@@ -991,11 +996,26 @@ ${image ? "Recuerda: el array \"nodes\" debe incluir absolutamente todas las caj
       // crash the save (org_nodes.id is a primary key), so it's fixed at the source rather
       // than trusted through.
       const seenIds = new Set<string>();
+      const renamedIds = new Map<string, string>();
       const dedupedNodes = parsed.nodes.map((node: any, idx: number) => {
-        if (seenIds.has(node.id)) return { ...node, id: `${node.id}-dup${idx}` };
+        if (seenIds.has(node.id)) {
+          const newId = `${node.id}-dup${idx}`;
+          renamedIds.set(node.id, newId);
+          return { ...node, id: newId };
+        }
         seenIds.add(node.id);
         return node;
       });
+      const finalIds = new Set(dedupedNodes.map((n: any) => n.id));
+      // A coordinationLink pointing at an id that got renamed above (or that never existed
+      // in this batch to begin with) needs to be fixed up or dropped, or it'd just point at
+      // nothing once saved.
+      for (const node of dedupedNodes) {
+        if (!Array.isArray(node.coordinationLinks)) continue;
+        node.coordinationLinks = node.coordinationLinks
+          .map((link: any) => (renamedIds.has(link?.targetId) ? { ...link, targetId: renamedIds.get(link.targetId) } : link))
+          .filter((link: any) => link?.targetId && finalIds.has(link.targetId) && link.targetId !== node.id);
+      }
 
       // `sede` is force-stamped server-side rather than trusted from the model's output.
       const positions = layoutAiNodes(dedupedNodes.map((n: any) => ({ id: n.id, parentId: n.parentId ?? null })));
