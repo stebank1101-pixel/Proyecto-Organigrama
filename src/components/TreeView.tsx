@@ -438,38 +438,7 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
           const y2 = node.freeY;
           const midX = (x1 + x2) / 2 + (node.lineOffsetX ?? 0);
           const midY = (y1 + y2) / 2 + (node.lineOffsetY ?? 0);
-          return (
-            <g key={node.id}>
-              <path d={`M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`} fill="none" stroke="rgba(100,116,139,0.35)" strokeWidth={2} />
-              {!readOnly && (
-                <>
-                  <circle
-                    cx={midX}
-                    cy={midY}
-                    r={7}
-                    className="fill-white stroke-sky-400 hover:fill-sky-100"
-                    strokeWidth={2}
-                    style={{ pointerEvents: "auto", cursor: "grab", touchAction: "none" }}
-                    onPointerDown={(e) => handleLinePointerDown(e, node.id, midX, midY)}
-                    onDoubleClick={(e) => handleLineDoubleClick(e, node.id)}
-                  >
-                    <title>Arrastra para curvar esta conexión (doble clic para restablecer)</title>
-                  </circle>
-                  <g
-                    transform={`translate(${midX + 26}, ${midY - 26})`}
-                    style={{ pointerEvents: "auto", cursor: "pointer" }}
-                    onClick={() => onLineDelete?.(node.id)}
-                  >
-                    <circle r={7} className="fill-white stroke-rose-400 hover:fill-rose-50" strokeWidth={2} />
-                    <text textAnchor="middle" dominantBaseline="central" fontSize={10} className="select-none fill-rose-500">
-                      ×
-                    </text>
-                    <title>Quitar esta línea (el nodo queda sin jefe)</title>
-                  </g>
-                </>
-              )}
-            </g>
-          );
+          return <path key={node.id} d={`M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`} fill="none" stroke="rgba(100,116,139,0.35)" strokeWidth={2} />;
         })}
 
         {/* Functional-coordination lines — independent of the reporting hierarchy. Each
@@ -487,58 +456,14 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
             const midX = (p1.x + p2.x) / 2 + (link.offsetX ?? 0);
             const midY = (p1.y + p2.y) / 2 + (link.offsetY ?? 0);
             return (
-              <g key={`${node.id}->${link.targetId}`}>
-                <path
-                  d={`M ${p1.x} ${p1.y} Q ${midX} ${midY} ${p2.x} ${p2.y}`}
-                  fill="none"
-                  stroke="rgba(168,85,247,0.7)"
-                  strokeWidth={2}
-                  strokeDasharray={link.style === "dashed" ? "6 4" : undefined}
-                />
-                {!readOnly && (
-                  <>
-                    <circle
-                      cx={midX}
-                      cy={midY}
-                      r={7}
-                      className="fill-white stroke-sky-400 hover:fill-sky-100"
-                      strokeWidth={2}
-                      style={{ pointerEvents: "auto", cursor: "grab", touchAction: "none" }}
-                      onPointerDown={(e) => handleCoordLinePointerDown(e, node.id, link.targetId, midX, midY)}
-                    >
-                      <title>Arrastra para curvar esta línea de coordinación</title>
-                    </circle>
-                    <g
-                      transform={`translate(${midX - 28}, ${midY - 28})`}
-                      style={{ pointerEvents: "auto", cursor: "pointer" }}
-                      onClick={() => onCoordinationStyleToggle?.(node.id, link.targetId)}
-                    >
-                      <circle r={7} className="fill-white stroke-slate-400 hover:fill-slate-50" strokeWidth={2} />
-                      <line
-                        x1={-3.5}
-                        y1={0}
-                        x2={3.5}
-                        y2={0}
-                        stroke="rgb(100,116,139)"
-                        strokeWidth={1.5}
-                        strokeDasharray={link.style === "dashed" ? "2 1.5" : undefined}
-                      />
-                      <title>{link.style === "dashed" ? "Cambiar a línea continua" : "Cambiar a línea punteada"}</title>
-                    </g>
-                    <g
-                      transform={`translate(${midX + 28}, ${midY - 28})`}
-                      style={{ pointerEvents: "auto", cursor: "pointer" }}
-                      onClick={() => onCoordinationUnlink?.(node.id, link.targetId)}
-                    >
-                      <circle r={7} className="fill-white stroke-rose-400 hover:fill-rose-50" strokeWidth={2} />
-                      <text textAnchor="middle" dominantBaseline="central" fontSize={10} className="select-none fill-rose-500">
-                        ×
-                      </text>
-                      <title>Quitar esta línea de coordinación</title>
-                    </g>
-                  </>
-                )}
-              </g>
+              <path
+                key={`${node.id}->${link.targetId}`}
+                d={`M ${p1.x} ${p1.y} Q ${midX} ${midY} ${p2.x} ${p2.y}`}
+                fill="none"
+                stroke="rgba(168,85,247,0.7)"
+                strokeWidth={2}
+                strokeDasharray={link.style === "dashed" ? "6 4" : undefined}
+              />
             );
           })
         )}
@@ -588,6 +513,131 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
           />
         </div>
       ))}
+
+      {/* Interactive line controls, drawn in their own layer AFTER the cards so they always
+          sit on top and stay grabbable even when a bend point lands close to (or under) a
+          card's edge. A larger invisible circle around each handle widens the hit area
+          beyond the visible dot, which matters most in the tight gap between two cards. */}
+      {!readOnly && (
+        <svg className="pointer-events-none absolute inset-0" width={bounds.width} height={bounds.height}>
+          {nodes.map((node) => {
+            if (!node.parentId) return null;
+            const parent = nodesById.get(node.parentId);
+            if (!parent) return null;
+            const x1 = parent.freeX + CARD_W / 2;
+            const y1 = parent.freeY + CARD_H;
+            const x2 = node.freeX + CARD_W / 2;
+            const y2 = node.freeY;
+            const midX = (x1 + x2) / 2 + (node.lineOffsetX ?? 0);
+            const midY = (y1 + y2) / 2 + (node.lineOffsetY ?? 0);
+            return (
+              <g key={node.id}>
+                <circle
+                  cx={midX}
+                  cy={midY}
+                  r={14}
+                  fill="transparent"
+                  style={{ pointerEvents: "auto", cursor: "grab", touchAction: "none" }}
+                  onPointerDown={(e) => handleLinePointerDown(e, node.id, midX, midY)}
+                  onDoubleClick={(e) => handleLineDoubleClick(e, node.id)}
+                />
+                <circle
+                  cx={midX}
+                  cy={midY}
+                  r={7}
+                  className="fill-white stroke-sky-400 hover:fill-sky-100"
+                  strokeWidth={2}
+                  style={{ pointerEvents: "auto", cursor: "grab", touchAction: "none" }}
+                  onPointerDown={(e) => handleLinePointerDown(e, node.id, midX, midY)}
+                  onDoubleClick={(e) => handleLineDoubleClick(e, node.id)}
+                >
+                  <title>Arrastra para curvar esta conexión (doble clic para restablecer)</title>
+                </circle>
+                <g
+                  transform={`translate(${midX + 26}, ${midY - 26})`}
+                  style={{ pointerEvents: "auto", cursor: "pointer" }}
+                  onClick={() => onLineDelete?.(node.id)}
+                >
+                  <circle r={11} fill="transparent" />
+                  <circle r={7} className="fill-white stroke-rose-400 hover:fill-rose-50" strokeWidth={2} />
+                  <text textAnchor="middle" dominantBaseline="central" fontSize={10} className="select-none fill-rose-500">
+                    ×
+                  </text>
+                  <title>Quitar esta línea (el nodo queda sin jefe)</title>
+                </g>
+              </g>
+            );
+          })}
+
+          {nodes.flatMap((node) =>
+            (node.coordinationLinks || []).map((link) => {
+              const target = nodesById.get(link.targetId);
+              if (!target) return null;
+              const cx1 = node.freeX + CARD_W / 2;
+              const cy1 = node.freeY + CARD_H / 2;
+              const cx2 = target.freeX + CARD_W / 2;
+              const cy2 = target.freeY + CARD_H / 2;
+              const p1 = clipToRectEdge(cx1, cy1, cx2, cy2, CARD_W, CARD_H);
+              const p2 = clipToRectEdge(cx2, cy2, cx1, cy1, CARD_W, CARD_H);
+              const midX = (p1.x + p2.x) / 2 + (link.offsetX ?? 0);
+              const midY = (p1.y + p2.y) / 2 + (link.offsetY ?? 0);
+              return (
+                <g key={`${node.id}->${link.targetId}`}>
+                  <circle
+                    cx={midX}
+                    cy={midY}
+                    r={14}
+                    fill="transparent"
+                    style={{ pointerEvents: "auto", cursor: "grab", touchAction: "none" }}
+                    onPointerDown={(e) => handleCoordLinePointerDown(e, node.id, link.targetId, midX, midY)}
+                  />
+                  <circle
+                    cx={midX}
+                    cy={midY}
+                    r={7}
+                    className="fill-white stroke-sky-400 hover:fill-sky-100"
+                    strokeWidth={2}
+                    style={{ pointerEvents: "auto", cursor: "grab", touchAction: "none" }}
+                    onPointerDown={(e) => handleCoordLinePointerDown(e, node.id, link.targetId, midX, midY)}
+                  >
+                    <title>Arrastra para curvar esta línea de coordinación</title>
+                  </circle>
+                  <g
+                    transform={`translate(${midX - 28}, ${midY - 28})`}
+                    style={{ pointerEvents: "auto", cursor: "pointer" }}
+                    onClick={() => onCoordinationStyleToggle?.(node.id, link.targetId)}
+                  >
+                    <circle r={11} fill="transparent" />
+                    <circle r={7} className="fill-white stroke-slate-400 hover:fill-slate-50" strokeWidth={2} />
+                    <line
+                      x1={-3.5}
+                      y1={0}
+                      x2={3.5}
+                      y2={0}
+                      stroke="rgb(100,116,139)"
+                      strokeWidth={1.5}
+                      strokeDasharray={link.style === "dashed" ? "2 1.5" : undefined}
+                    />
+                    <title>{link.style === "dashed" ? "Cambiar a línea continua" : "Cambiar a línea punteada"}</title>
+                  </g>
+                  <g
+                    transform={`translate(${midX + 28}, ${midY - 28})`}
+                    style={{ pointerEvents: "auto", cursor: "pointer" }}
+                    onClick={() => onCoordinationUnlink?.(node.id, link.targetId)}
+                  >
+                    <circle r={11} fill="transparent" />
+                    <circle r={7} className="fill-white stroke-rose-400 hover:fill-rose-50" strokeWidth={2} />
+                    <text textAnchor="middle" dominantBaseline="central" fontSize={10} className="select-none fill-rose-500">
+                      ×
+                    </text>
+                    <title>Quitar esta línea de coordinación</title>
+                  </g>
+                </g>
+              );
+            })
+          )}
+        </svg>
+      )}
     </div>
   );
 });
