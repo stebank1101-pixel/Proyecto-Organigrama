@@ -605,9 +605,13 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
       {/* Interactive line controls, drawn in their own layer AFTER the cards so they always
           sit on top and stay grabbable even when a bend point lands close to (or under) a
           card's edge. A larger invisible circle around each handle widens the hit area
-          beyond the visible dot, which matters most in the tight gap between two cards. */}
+          beyond the visible dot, which matters most in the tight gap between two cards.
+          data-export-hide lets exportAs() strip this whole layer from the DOM right before
+          capture — their fill/stroke colors come from Tailwind classes on raw SVG elements,
+          which the html-to-image capture doesn't resolve, so on export they'd otherwise show
+          up as solid black circles instead of their on-screen white/colored look. */}
       {!readOnly && (
-        <svg className="pointer-events-none absolute inset-0" width={bounds.width} height={bounds.height}>
+        <svg data-export-hide="true" className="pointer-events-none absolute inset-0" width={bounds.width} height={bounds.height}>
           {nodes.map((node) => {
             if (!node.parentId) return null;
             const parent = nodesById.get(node.parentId);

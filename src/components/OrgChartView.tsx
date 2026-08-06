@@ -306,6 +306,12 @@ export function OrgChartView({
     const node = contentRef.current;
     if (!node) return;
     setExporting(true);
+    // The line-bend/delete handles rely on Tailwind fill/stroke classes on raw SVG elements,
+    // which the html-to-image capture doesn't resolve — they'd render as solid black dots in
+    // the exported image instead of their on-screen white/colored look. They're edit-only
+    // controls anyway, so just pull them out of the DOM for the capture and put them back after.
+    const controlLayers = Array.from(node.querySelectorAll<SVGElement>('[data-export-hide="true"]'));
+    controlLayers.forEach((el) => el.style.setProperty("display", "none"));
     try {
       const options = { backgroundColor: "#ffffff", pixelRatio: 2 };
       if (format === "png") {
@@ -332,6 +338,7 @@ export function OrgChartView({
     } catch (err) {
       console.error("Error exportando organigrama", err);
     } finally {
+      controlLayers.forEach((el) => el.style.removeProperty("display"));
       setExporting(false);
     }
   }
