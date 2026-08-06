@@ -484,7 +484,9 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
         className="relative flex h-full items-center justify-center text-sm text-slate-500"
         style={{
           ...(canvasBackgroundColor ? { backgroundColor: canvasBackgroundColor } : {}),
-          ...(canvasBackgroundImage ? { backgroundImage: `url(${canvasBackgroundImage})`, backgroundRepeat: "repeat" } : {}),
+          // Quoted so a data: URI's own unescaped "(" / ")" (e.g. inside a transform="rotate(...)"
+          // in an embedded SVG) doesn't get mistaken for the end of the url() token.
+          ...(canvasBackgroundImage ? { backgroundImage: `url("${canvasBackgroundImage}")`, backgroundRepeat: "repeat" } : {}),
         }}
       >
         {logo && <img src={logo} alt="" className="pointer-events-none absolute left-6 top-6 max-h-16 max-w-[200px] object-contain" />}
@@ -507,7 +509,9 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
           height: bounds.height,
           transform: `scale(${zoom})`,
           ...(canvasBackgroundColor ? { backgroundColor: canvasBackgroundColor } : {}),
-          ...(canvasBackgroundImage ? { backgroundImage: `url(${canvasBackgroundImage})`, backgroundRepeat: "repeat" } : {}),
+          // Quoted so a data: URI's own unescaped "(" / ")" (e.g. inside a transform="rotate(...)"
+          // in an embedded SVG) doesn't get mistaken for the end of the url() token.
+          ...(canvasBackgroundImage ? { backgroundImage: `url("${canvasBackgroundImage}")`, backgroundRepeat: "repeat" } : {}),
         }}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
