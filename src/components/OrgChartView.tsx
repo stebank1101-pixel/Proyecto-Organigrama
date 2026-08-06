@@ -3,6 +3,7 @@ import { jsPDF } from "jspdf";
 import { ArrowLeft, Building2, Download, FileImage, FileText, IdCard, Link2, Minus, Plus, Save, Search, Settings } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import defaultLogo from "../assets/chec-logo.jpg";
+import { composeChartWithHeader } from "../lib/exportFrame";
 import { useT } from "../lib/i18n";
 import { defaultWatermarkBackground } from "../lib/watermark";
 import { computeAllSedes, computeWorkCenterRows, type CenterSelection } from "../lib/workCenters";
@@ -316,26 +317,29 @@ export function OrgChartView({
     controlLayers.forEach((el) => el.style.setProperty("display", "none"));
     try {
       const options = { backgroundColor: "#ffffff", pixelRatio: 2 };
-      if (format === "png") {
-        const dataUrl = await toPng(node, options);
-        downloadUrl(dataUrl, "organigrama.png");
-      } else if (format === "svg") {
+      if (format === "svg") {
+        // Compositing a raster header onto a vector export would throw away the point of
+        // exporting SVG in the first place, so this format stays the plain chart capture.
         const dataUrl = await toSvg(node, options);
         downloadUrl(dataUrl, "organigrama.svg");
       } else {
-        const dataUrl = await toPng(node, options);
-        const img = new Image();
-        img.src = dataUrl;
-        await new Promise((resolve) => {
-          img.onload = resolve;
-        });
-        const pdf = new jsPDF({
-          orientation: img.width >= img.height ? "landscape" : "portrait",
-          unit: "px",
-          format: [img.width, img.height],
-        });
-        pdf.addImage(dataUrl, "PNG", 0, 0, img.width, img.height, undefined, "FAST");
-        pdf.save("organigrama.pdf");
+        const rawDataUrl = await toPng(node, options);
+        const { dataUrl, width, height } = await composeChartWithHeader(
+          rawDataUrl,
+          activeCenter || "ORGANIGRAMA",
+          activeCenterProfile?.logo
+        );
+        if (format === "png") {
+          downloadUrl(dataUrl, "organigrama.png");
+        } else {
+          const pdf = new jsPDF({
+            orientation: width >= height ? "landscape" : "portrait",
+            unit: "px",
+            format: [width, height],
+          });
+          pdf.addImage(dataUrl, "PNG", 0, 0, width, height, undefined, "FAST");
+          pdf.save("organigrama.pdf");
+        }
       }
     } catch (err) {
       console.error("Error exportando organigrama", err);
