@@ -36,7 +36,10 @@ export async function composeChartWithHeader(
 
   const width = chartImg.width;
   const headerHeight = Math.max(130, Math.min(260, Math.round(width * 0.09)));
-  const height = headerHeight + chartImg.height;
+  // Breathing room below the divider so the chart's first row of cards doesn't butt right up
+  // against the header — without it the top node reads as crammed underneath the title bar.
+  const topPadding = Math.max(40, Math.round(width * 0.02));
+  const height = headerHeight + topPadding + chartImg.height;
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -44,6 +47,10 @@ export async function composeChartWithHeader(
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("2D canvas context unavailable");
 
+  // White base first so the topPadding gap below the header reads as normal chart margin
+  // rather than an extension of the gray header band.
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = HEADER_BG;
   ctx.fillRect(0, 0, width, headerHeight);
 
@@ -105,7 +112,7 @@ export async function composeChartWithHeader(
   ctx.lineTo(width, headerHeight);
   ctx.stroke();
 
-  ctx.drawImage(chartImg, 0, headerHeight);
+  ctx.drawImage(chartImg, 0, headerHeight + topPadding);
 
   return { dataUrl: canvas.toDataURL("image/png"), width, height };
 }
