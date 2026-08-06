@@ -36,10 +36,13 @@ export function NodeCard({
 }: NodeCardProps) {
   const t = useT();
   const isLink = !!node.linkTargetSede;
+  const isInactive = node.status === "inactive";
   const style = getDepartmentStyle(node.department);
   const textStyle: React.CSSProperties | undefined = node.textColor ? { color: node.textColor } : undefined;
   const mutedTextStyle: React.CSSProperties | undefined = node.textColor ? { color: node.textColor, opacity: 0.75 } : undefined;
   const cardStyle: React.CSSProperties = {
+    // Inactive nodes fall back to gray unless the user picked a custom card color explicitly.
+    ...(isInactive ? { backgroundColor: "#f1f5f9" } : {}),
     ...(node.cardColor ? { backgroundColor: node.cardColor } : {}),
     ...(node.fontFamily ? { fontFamily: node.fontFamily } : {}),
     ...(node.borderColor ? { borderColor: node.borderColor, ["--tw-ring-color" as string]: node.borderColor } : {}),
@@ -54,13 +57,13 @@ export function NodeCard({
       data-card="true"
       style={cardStyle}
       className={`group relative w-[240px] select-none rounded-xl border bg-white p-3 shadow-md transition-shadow ${
-        isLink ? "border-dashed border-sky-300 ring-sky-300" : style.ring
+        isLink ? "border-dashed border-sky-300 ring-sky-300" : isInactive ? "border-slate-300 ring-slate-300" : style.ring
       } ${highlighted ? "ring-2 shadow-[0_0_0_3px_rgba(56,189,248,0.25)]" : "ring-1"} ${isLink ? "cursor-pointer hover:bg-sky-50/60" : ""}`}
       title={isLink ? t.nodeCard.openOrgChart(node.linkTargetSede!) : undefined}
     >
       <div
         className={`absolute -top-2.5 -left-2.5 flex h-7 w-7 items-center justify-center overflow-hidden rounded-full text-white shadow ${
-          isLink ? "bg-sky-500" : node.customIcon ? "bg-white ring-1 ring-slate-200" : style.iconBg
+          isLink ? "bg-sky-500" : node.customIcon ? "bg-white ring-1 ring-slate-200" : isInactive ? "bg-slate-400" : style.iconBg
         }`}
       >
         {isLink ? (
@@ -78,7 +81,11 @@ export function NodeCard({
       />
 
       <div className="pt-1">
-        <p className="break-words text-sm font-semibold text-slate-900" style={textStyle} title={node.title}>
+        <p
+          className={`break-words text-sm font-semibold ${isInactive ? "text-slate-500" : "text-slate-900"}`}
+          style={textStyle}
+          title={node.title}
+        >
           {node.title || t.nodeCard.untitledRole}
         </p>
         {isLink ? (
