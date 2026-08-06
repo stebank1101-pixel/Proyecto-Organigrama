@@ -4,6 +4,7 @@ import { ArrowLeft, Building2, Download, FileImage, FileText, IdCard, Link2, Min
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import defaultLogo from "../assets/chec-logo.jpg";
 import { useT } from "../lib/i18n";
+import { defaultWatermarkBackground } from "../lib/watermark";
 import { computeAllSedes, computeWorkCenterRows, type CenterSelection } from "../lib/workCenters";
 import type { OrgNode, WorkCenter } from "../types";
 import { AllCentersOverview } from "./AllCentersOverview";
@@ -527,7 +528,7 @@ export function OrgChartView({
                   zoom={zoom}
                   logo={activeCenterProfile?.logo || defaultLogo}
                   canvasBackgroundColor={activeCenterProfile?.backgroundColor}
-                  canvasBackgroundImage={activeCenterProfile?.backgroundImage}
+                  canvasBackgroundImage={activeCenterProfile?.backgroundImage || defaultWatermarkBackground}
                   readOnly={readOnly}
                   compact={compact}
                   linkMode={linkMode}
