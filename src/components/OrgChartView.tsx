@@ -2,6 +2,7 @@ import { toPng, toSvg } from "html-to-image";
 import { jsPDF } from "jspdf";
 import { ArrowLeft, Building2, Download, FileImage, FileText, IdCard, Link2, Minus, Plus, Save, Search, Settings } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import defaultLogo from "../assets/chec-logo.jpg";
 import { useT } from "../lib/i18n";
 import { computeAllSedes, computeWorkCenterRows, type CenterSelection } from "../lib/workCenters";
 import type { OrgNode, WorkCenter } from "../types";
@@ -524,7 +525,7 @@ export function OrgChartView({
                   onNodeMove={onMoveNode}
                   onNavigateToSede={handleNavigateToSede}
                   zoom={zoom}
-                  logo={activeCenterProfile?.logo}
+                  logo={activeCenterProfile?.logo || defaultLogo}
                   canvasBackgroundColor={activeCenterProfile?.backgroundColor}
                   canvasBackgroundImage={activeCenterProfile?.backgroundImage}
                   readOnly={readOnly}
