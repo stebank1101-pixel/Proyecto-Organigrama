@@ -35,16 +35,15 @@ function mostCommon(values: (string | undefined)[]): string | undefined {
   return best;
 }
 
-function dominantNodeColors(nodes: OrgNode[], sede?: string): Pick<OrgNode, "cardColor" | "textColor" | "borderColor"> {
+function dominantNodeColors(nodes: OrgNode[], sede?: string): Pick<OrgNode, "cardColor" | "textColor"> {
   const scoped = sede ? nodes.filter((n) => n.sede === sede) : nodes;
   return {
     cardColor: mostCommon(scoped.map((n) => n.cardColor)),
     textColor: mostCommon(scoped.map((n) => n.textColor)),
-    borderColor: mostCommon(scoped.map((n) => n.borderColor)),
   };
 }
 
-function emptyNode(defaultParentId: string | null, defaultSede: string | undefined, colorDefaults: Pick<OrgNode, "cardColor" | "textColor" | "borderColor">): OrgNode {
+function emptyNode(defaultParentId: string | null, defaultSede: string | undefined, colorDefaults: Pick<OrgNode, "cardColor" | "textColor">): OrgNode {
   return {
     id: "",
     name: "",
@@ -65,7 +64,6 @@ function emptyNode(defaultParentId: string | null, defaultSede: string | undefin
     iconName: "User",
     cardColor: colorDefaults.cardColor,
     textColor: colorDefaults.textColor,
-    borderColor: colorDefaults.borderColor,
   };
 }
 
@@ -277,19 +275,6 @@ export function NodeModal({ open, initial, defaultParentId, defaultSede, nodes, 
                     onChange={(e) => update("textColor", e.target.value)}
                   />
                   <button type="button" className="text-[11px] text-sky-600 hover:underline" onClick={() => update("textColor", "")}>
-                    {t.nodeModal.reset}
-                  </button>
-                </div>
-              </Field>
-              <Field label={t.nodeModal.borderColor}>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-white p-0.5"
-                    value={form.borderColor || "#e2e8f0"}
-                    onChange={(e) => update("borderColor", e.target.value)}
-                  />
-                  <button type="button" className="text-[11px] text-sky-600 hover:underline" onClick={() => update("borderColor", "")}>
                     {t.nodeModal.reset}
                   </button>
                 </div>

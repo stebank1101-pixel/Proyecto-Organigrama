@@ -45,7 +45,6 @@ export function NodeCard({
     ...(isInactive ? { backgroundColor: "#f1f5f9" } : {}),
     ...(node.cardColor ? { backgroundColor: node.cardColor } : {}),
     ...(node.fontFamily ? { fontFamily: node.fontFamily } : {}),
-    ...(node.borderColor ? { borderColor: node.borderColor, ["--tw-ring-color" as string]: node.borderColor } : {}),
   };
   // A department line with nothing to show would otherwise render as an empty row —
   // only the secondary lines that actually have content take up space.

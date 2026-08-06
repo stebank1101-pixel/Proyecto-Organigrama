@@ -165,7 +165,6 @@ export const zh: Dictionary = {
     active: "在职",
     inactive: "离职",
     badge: "标识",
-    borderColor: "边框颜色",
     linkSectionTitle: "指向其他工作中心的链接",
     linkSectionHint: "将此职位变为快捷方式：点击它会打开所选工作中心的组织架构图，而不是显示此人的信息。",
     linkNoneOption: "— 不是链接 —",

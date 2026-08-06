@@ -165,7 +165,6 @@ export const es = {
     active: "Activo",
     inactive: "Inactivo",
     badge: "Distintivo (badge)",
-    borderColor: "Color del borde",
     linkSectionTitle: "Enlace a otro centro de trabajo",
     linkSectionHint:
       "Convierte este cargo en un acceso directo: al hacer clic sobre él se abrirá el organigrama del centro elegido, en vez de mostrar los datos de esta persona.",
