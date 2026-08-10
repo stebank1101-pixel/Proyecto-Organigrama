@@ -1048,4 +1048,44 @@ ${
   }
 });
 
+const TRANSLATE_LANGUAGE_NAMES: Record<string, string> = { en: "English", zh: "Simplified Chinese" };
+
+// Translates org-chart display text (node titles, names, departments) for whichever UI
+// language is selected. No auth required — read-only guests need translated cards too, and
+// this never touches stored node data, only returns text for the client to cache and render.
+app.post("/api/ai/translate", async (req, res) => {
+  try {
+    const texts = Array.isArray(req.body?.texts) ? (req.body.texts as unknown[]).filter((t) => typeof t === "string") : [];
+    const targetLanguage = TRANSLATE_LANGUAGE_NAMES[req.body?.targetLanguage] ? (req.body.targetLanguage as string) : null;
+    if (texts.length === 0 || !targetLanguage) {
+      return res.json({ translations: texts });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return sendError(res, 400, "AI_NOT_CONFIGURED");
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-flash-latest",
+      contents: `Translate every string in this JSON array to ${TRANSLATE_LANGUAGE_NAMES[targetLanguage]}.
+Rules:
+- Return ONLY a JSON array of strings, in the exact same order, with exactly ${texts.length} items — no other text.
+- If a string is a person's proper name, or a brand/company/work-center name, return it UNCHANGED.
+- Otherwise translate job titles, department names, and descriptive labels naturally, keeping them short.
+Input: ${JSON.stringify(texts)}`,
+      config: { responseMimeType: "application/json" }
+    });
+
+    const parsed = JSON.parse(response.text || "[]");
+    if (!Array.isArray(parsed) || parsed.length !== texts.length) {
+      return sendError(res, 500, "AI_RESPONSE_FORMAT_ERROR");
+    }
+    res.json({ translations: parsed.map((v: unknown, i: number) => (typeof v === "string" && v ? v : texts[i])) });
+  } catch (err: any) {
+    return sendError(res, 500, "AI_COMMUNICATION_ERROR", err);
+  }
+});
+
 export default app;

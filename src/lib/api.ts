@@ -179,3 +179,13 @@ export function generateAiOrg(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+/** Translates arbitrary org-chart display text (node titles, names, departments) into
+ * `targetLanguage` via the backend's Gemini-backed endpoint. Used only for display — never
+ * for content that gets saved back. `texts` order/length is mirrored in the response. */
+export function translateTexts(texts: string[], targetLanguage: string): Promise<{ translations: string[] }> {
+  return request("/api/ai/translate", {
+    method: "POST",
+    body: JSON.stringify({ texts, targetLanguage }),
+  });
+}

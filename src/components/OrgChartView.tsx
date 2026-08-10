@@ -4,7 +4,8 @@ import { ArrowLeft, Building2, Download, FileImage, FileText, IdCard, Link2, Min
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import defaultLogo from "../assets/chec-logo.jpg";
 import { composeChartWithHeader } from "../lib/exportFrame";
-import { useT } from "../lib/i18n";
+import { useLanguage } from "../lib/i18n";
+import { useTranslatedNodes } from "../lib/useContentTranslation";
 import { defaultWatermarkBackground } from "../lib/watermark";
 import { computeAllSedes, computeWorkCenterRows, type CenterSelection } from "../lib/workCenters";
 import type { OrgNode, WorkCenter } from "../types";
@@ -106,7 +107,7 @@ export function OrgChartView({
   dirty,
   readOnly,
 }: OrgChartViewProps) {
-  const t = useT();
+  const { t, language } = useLanguage();
   const [selectedCenter, setSelectedCenter] = useState<CenterSelection>(null);
   // Once work centers finish loading, jump straight to whichever one is marked as default
   // instead of the picker — but only the first time, so deliberately going back to the
@@ -251,6 +252,11 @@ export function OrgChartView({
     () => computeVisibleNodes(centerNodes, deptFilter, search),
     [centerNodes, deptFilter, search]
   );
+  // Display-only: translated title/name/department/customBadge text for whatever language is
+  // selected. Edit/delete flows must never see these — they resolve back to the original
+  // (untranslated) node by id, so saving never writes translated text back as real data.
+  const displayNodes = useTranslatedNodes(nodes, language);
+  const displayVisibleNodes = useTranslatedNodes(visibleNodes, language);
 
   function openCreate(parentId: string | null) {
     if (readOnly) return;
@@ -264,7 +270,14 @@ export function OrgChartView({
 
   function openEdit(node: OrgNode) {
     if (readOnly) return;
-    setModalState({ open: true, initial: node, parentId: null });
+    // `node` may be a display-translated copy (see displayVisibleNodes) — always edit the
+    // real, untranslated record so saving never writes translated text back as real data.
+    const original = nodes.find((n) => n.id === node.id) || node;
+    setModalState({ open: true, initial: original, parentId: null });
+  }
+
+  function handleDeleteRequest(node: OrgNode) {
+    setDeleteTarget(nodes.find((n) => n.id === node.id) || node);
   }
 
   function handleModalSave(node: OrgNode) {
@@ -513,7 +526,7 @@ export function OrgChartView({
               {selectedCenter === "ALL" ? (
                 <AllCentersOverview
                   ref={contentRef}
-                  nodes={nodes}
+                  nodes={displayNodes}
                   allSedes={allSedes}
                   compact={compact}
                   onNavigateToSede={handleNavigateToSede}
@@ -522,9 +535,9 @@ export function OrgChartView({
               ) : (
                 <TreeView
                   ref={contentRef}
-                  nodes={visibleNodes}
+                  nodes={displayVisibleNodes}
                   onEdit={openEdit}
-                  onDelete={setDeleteTarget}
+                  onDelete={handleDeleteRequest}
                   onAddChild={(p) => openCreate(p.id)}
                   onRemoveBoss={readOnly ? undefined : (node) => onLineDelete(node.id)}
                   onNodeMove={onMoveNode}
