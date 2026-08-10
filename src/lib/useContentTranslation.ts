@@ -68,8 +68,10 @@ export function useTranslatedNodes(nodes: OrgNode[], language: Language): OrgNod
           return next;
         });
       })
-      .catch(() => {
-        // Soft-fail: keep showing the original text.
+      .catch((err) => {
+        // Soft-fail: keep showing the original text. Logged (not surfaced in the UI) so a
+        // misconfigured GEMINI_API_KEY on the deploy target is still diagnosable from devtools.
+        console.error("Content translation failed:", err);
       })
       .finally(() => {
         uncached.forEach((text) => inFlight.current.delete(text));
