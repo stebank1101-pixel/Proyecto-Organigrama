@@ -5,10 +5,13 @@ import type { OrgNode } from "../types";
 
 const CACHE_STORAGE_KEY = "orgcraft.translationCache.v1";
 
-// The org-chart fields that carry free text an admin typed in, as opposed to identifiers
-// (sede/department are also used to filter/route and must stay in their original form) —
-// see NodeCard.tsx for how title/name/department show up on a card.
-const TRANSLATABLE_FIELDS = ["title", "name", "department", "customBadge"] as const;
+// The org-chart fields that carry descriptive free text, as opposed to identifiers (sede is
+// used to filter/route and must stay in its original form) or people's actual names — `name`
+// is deliberately excluded even though NodeCard.tsx displays it, because it holds real staff
+// names (e.g. "Li Gang", "Zhang Xi"), not descriptions: running it through translation both
+// makes no sense and, in testing, corrupted accented names (Gemini drops diacritics even when
+// told to leave proper names unchanged).
+const TRANSLATABLE_FIELDS = ["title", "department", "customBadge"] as const;
 type TranslatableField = (typeof TRANSLATABLE_FIELDS)[number];
 
 type LangCache = Record<string, string>;
