@@ -3,6 +3,7 @@ import { useState } from "react";
 import checLogo from "../assets/chec-logo.jpg";
 import { useAuth } from "../lib/auth";
 import { LANGUAGE_LABELS, useLanguage, type Language } from "../lib/i18n";
+import { translateApiError } from "../lib/api";
 
 export function LoginView() {
   const { login, enterGuestMode } = useAuth();
@@ -20,7 +21,7 @@ export function LoginView() {
     try {
       await login(email, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.login.genericError);
+      setError(translateApiError(err, t, t.login.genericError));
     } finally {
       setLoading(false);
     }
@@ -45,7 +46,7 @@ export function LoginView() {
         </div>
 
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
-          <img src={checLogo} alt="Logo CHEC" className="h-16 w-auto" />
+          <img src={checLogo} alt={t.login.logoAlt} className="h-16 w-auto" />
           <h1 className="rounded-full bg-sky-50 px-4 py-1.5 text-base font-bold uppercase text-sky-700">{t.login.brandTitle}</h1>
         </div>
 

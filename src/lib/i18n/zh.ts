@@ -2,6 +2,28 @@ import type { Dictionary } from "./es";
 
 export const zh: Dictionary = {
   common: {
+    errors: {
+      SESSION_EXPIRED: "会话无效或已过期，请重新登录。",
+      ADMIN_ONLY: "只有管理员账号可以修改组织架构图。",
+      INVALID_CREDENTIALS: "邮箱或密码不正确",
+      NOT_AUTHENTICATED: "未登录",
+      PROFILE_MISSING_FIELDS: "姓名、邮箱和密码为必填项",
+      PROFILE_EMAIL_EXISTS: "该邮箱对应的账号已存在",
+      CANNOT_DELETE_SELF: "不能删除自己的账号",
+      PROFILE_NOT_FOUND: "未找到该账号",
+      LAST_ADMIN_REQUIRED: "系统必须至少保留一个管理员账号",
+      INVALID_NODES_FORMAT: "节点格式无效",
+      WORK_CENTER_NAME_REQUIRED: "工作中心名称为必填项",
+      NEW_NAME_REQUIRED: "新名称为必填项",
+      TARGET_SEDE_REQUIRED: "请指定接收此次同步的工作中心",
+      AI_TARGET_SEDE_REQUIRED: "请指定要为其生成组织架构图的工作中心",
+      AI_INVALID_ATTACHMENT: "附件文件无效",
+      AI_NOT_CONFIGURED: "未配置 GEMINI_API_KEY，请在设置面板中添加该密钥。",
+      AI_RESPONSE_FORMAT_ERROR: "无法解析 AI 模型的响应。",
+      AI_COMMUNICATION_ERROR: "与 Gemini AI 通信时出错",
+      NETWORK_ERROR: "无法连接到服务器，请检查网络连接。",
+      SERVER_ERROR: "服务器发生错误，请重试。",
+    },
     cancel: "取消",
     save: "保存",
     delete: "删除",
@@ -42,6 +64,7 @@ export const zh: Dictionary = {
   },
   login: {
     genericError: "无法登录",
+    logoAlt: "CHEC 标志",
     brandTitle: "CHEC-哥伦比亚 组织架构图",
     viewOrgCharts: "查看组织架构图",
     guestAccessDescription: "访客访问：以只读模式查看所有工作中心的组织架构图。",
@@ -146,6 +169,7 @@ export const zh: Dictionary = {
     textColor: "文字颜色",
     reset: "重置",
     fontType: "字体",
+    fontDefault: "默认 (Inter)",
     iconLogo: "图标 / 公司徽标",
     imageUrlPlaceholder: "图片链接 (https://...)",
     uploadImageTitle: "上传图片",
@@ -233,6 +257,7 @@ export const zh: Dictionary = {
     refreshTitle: "刷新",
     noLogs: "暂无同步记录。",
     syncError: "同步时出错",
+    syncSuccess: (count, provider) => `已成功从 ${provider} 完成同步（共 ${count} 条记录）。`,
     defaultProvider: "自定义 API",
   },
   aiGenerator: {

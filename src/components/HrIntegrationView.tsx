@@ -1,6 +1,6 @@
 import { KeyRound, Loader2, Plug, PlusCircle, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
-import { createApiKey, fetchApiKeys, fetchSyncLogs, triggerHrSync } from "../lib/api";
+import { createApiKey, fetchApiKeys, fetchSyncLogs, translateApiError, triggerHrSync } from "../lib/api";
 import { useT } from "../lib/i18n";
 import { computeAllSedes } from "../lib/workCenters";
 import type { ApiKeyRecord, OrgNode, SyncLogRecord, WorkCenter } from "../types";
@@ -64,13 +64,14 @@ export function HrIntegrationView({ nodes, workCenters, onSynced, readOnly }: Hr
     if (!targetSede) return;
     setSyncing(true);
     setMessage(null);
+    const provider = "Personio HR API (demo)";
     try {
-      const res = await triggerHrSync({ provider: "Personio HR API (demo)", mode, employees: SAMPLE_EMPLOYEES, targetSede });
-      setMessage(res.message);
+      const res = await triggerHrSync({ provider, mode, employees: SAMPLE_EMPLOYEES, targetSede });
+      setMessage(t.hrIntegration.syncSuccess(res.totalProcessed, provider));
       await refresh();
       onSynced();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : t.hrIntegration.syncError);
+      setMessage(translateApiError(err, t, t.hrIntegration.syncError));
     } finally {
       setSyncing(false);
     }

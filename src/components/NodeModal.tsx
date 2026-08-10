@@ -286,7 +286,7 @@ export function NodeModal({ open, initial, defaultParentId, defaultSede, nodes, 
                 <select className="input" value={form.fontFamily || ""} onChange={(e) => update("fontFamily", e.target.value)}>
                   {FONT_OPTIONS.map((f) => (
                     <option key={f.label} value={f.value}>
-                      {f.label}
+                      {f.value === "" ? t.nodeModal.fontDefault : f.label}
                     </option>
                   ))}
                 </select>

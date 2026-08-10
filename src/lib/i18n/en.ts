@@ -2,6 +2,28 @@ import type { Dictionary } from "./es";
 
 export const en: Dictionary = {
   common: {
+    errors: {
+      SESSION_EXPIRED: "Your session is invalid or expired. Please sign in again.",
+      ADMIN_ONLY: "Only admin profiles can modify the org chart.",
+      INVALID_CREDENTIALS: "Incorrect email or password",
+      NOT_AUTHENTICATED: "Not authenticated",
+      PROFILE_MISSING_FIELDS: "Name, email, and password are required",
+      PROFILE_EMAIL_EXISTS: "A profile with that email already exists",
+      CANNOT_DELETE_SELF: "You can't delete your own profile",
+      PROFILE_NOT_FOUND: "Profile not found",
+      LAST_ADMIN_REQUIRED: "There must be at least one admin profile",
+      INVALID_NODES_FORMAT: "Invalid node format",
+      WORK_CENTER_NAME_REQUIRED: "The work center name is required",
+      NEW_NAME_REQUIRED: "The new name is required",
+      TARGET_SEDE_REQUIRED: "You must specify which work center will receive the sync",
+      AI_TARGET_SEDE_REQUIRED: "You must specify which work center the org chart will be generated for",
+      AI_INVALID_ATTACHMENT: "The attached file is invalid",
+      AI_NOT_CONFIGURED: "GEMINI_API_KEY isn't configured. Add the key in the Settings panel.",
+      AI_RESPONSE_FORMAT_ERROR: "Couldn't parse the AI model's response.",
+      AI_COMMUNICATION_ERROR: "Error communicating with the Gemini AI",
+      NETWORK_ERROR: "Couldn't connect to the server. Check your connection.",
+      SERVER_ERROR: "A server error occurred. Please try again.",
+    },
     cancel: "Cancel",
     save: "Save",
     delete: "Delete",
@@ -42,6 +64,7 @@ export const en: Dictionary = {
   },
   login: {
     genericError: "Couldn't sign in",
+    logoAlt: "CHEC logo",
     brandTitle: "CHEC-COLOMBIA ORG CHART",
     viewOrgCharts: "View org charts",
     guestAccessDescription: "Guest access: browse every work center's org chart in read-only mode.",
@@ -148,6 +171,7 @@ export const en: Dictionary = {
     textColor: "Text color",
     reset: "Reset",
     fontType: "Font",
+    fontDefault: "Default (Inter)",
     iconLogo: "Icon / corporate logo",
     imageUrlPlaceholder: "Image URL (https://...)",
     uploadImageTitle: "Upload image",
@@ -236,6 +260,7 @@ export const en: Dictionary = {
     refreshTitle: "Refresh",
     noLogs: "No sync records yet.",
     syncError: "Error syncing",
+    syncSuccess: (count, provider) => `Sync completed successfully from ${provider} (${count} records).`,
     defaultProvider: "Custom API",
   },
   aiGenerator: {

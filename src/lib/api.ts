@@ -1,4 +1,6 @@
 import type { ApiKeyRecord, OrgNode, SyncLogRecord, UserProfile, WorkCenter } from "../types";
+import { ERROR_CODES, type ErrorCode } from "./errorCodes";
+import type { Dictionary } from "./i18n";
 
 const TOKEN_STORAGE_KEY = "orgcraft.auth.token";
 
@@ -14,16 +16,44 @@ export function getAuthToken() {
   return authToken;
 }
 
+/** Thrown by `request()` for any failed API call. Carries a language-agnostic `code`
+ * (see errorCodes.ts) instead of a raw message, so the UI can look up the right
+ * translation for whatever language is currently selected — see `translateApiError`. */
+export class ApiError extends Error {
+  code: ErrorCode;
+  constructor(code: ErrorCode) {
+    super(code);
+    this.name = "ApiError";
+    this.code = code;
+  }
+}
+
+function isErrorCode(value: unknown): value is ErrorCode {
+  return typeof value === "string" && (ERROR_CODES as readonly string[]).includes(value);
+}
+
+/** Maps a caught error to a translated message: an `ApiError`'s code goes through
+ * `t.common.errors`; a plain `Error` (e.g. FileReader failures) is trusted to already
+ * carry a translated message built from `t.*` at the throw site; anything else falls
+ * back to the caller's own translated default string. */
+export function translateApiError(err: unknown, t: Dictionary, fallback: string): string {
+  if (err instanceof ApiError) return t.common.errors[err.code];
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
-  const res = await fetch(url, {
-    headers,
-    ...options,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, { headers, ...options });
+  } catch {
+    throw new ApiError("NETWORK_ERROR");
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(body?.error || `Error ${res.status} al llamar ${url}`);
+    throw new ApiError(isErrorCode(body?.error) ? body.error : "SERVER_ERROR");
   }
   return body as T;
 }

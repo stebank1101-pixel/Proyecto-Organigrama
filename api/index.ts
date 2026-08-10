@@ -2,6 +2,15 @@ import "dotenv/config";
 import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import { supabase } from "./supabaseClient.js";
+import type { ErrorCode } from "../src/lib/errorCodes";
+
+/** Sends a stable error code instead of a hardcoded-language message — the frontend maps
+ * the code to whatever UI language is selected (see translateApiError / common.errors).
+ * The real error is still logged server-side so it stays debuggable. */
+function sendError(res: express.Response, status: number, code: ErrorCode, cause?: unknown) {
+  if (cause !== undefined) console.error(cause);
+  res.status(status).json({ error: code satisfies ErrorCode });
+}
 
 export const app = express();
 
@@ -502,14 +511,14 @@ async function requireAdmin(req: express.Request, res: express.Response, next: e
   try {
     const user = await getUserFromRequest(req);
     if (!user) {
-      return res.status(401).json({ error: "Sesión inválida o expirada. Inicia sesión nuevamente." });
+      return sendError(res, 401, "SESSION_EXPIRED");
     }
     if (user.role !== "admin") {
-      return res.status(403).json({ error: "Solo los perfiles de administrador pueden modificar el organigrama." });
+      return sendError(res, 403, "ADMIN_ONLY");
     }
     next();
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 }
 
@@ -521,23 +530,23 @@ app.post("/api/auth/login", async (req, res) => {
     const users = await loadUsers();
     const user = users.find((u) => u.email === email && u.password === password);
     if (!user) {
-      return res.status(401).json({ error: "Email o contraseña incorrectos" });
+      return sendError(res, 401, "INVALID_CREDENTIALS");
     }
     const token = generateToken();
     await createSession(token, user.id);
     res.json({ success: true, token, user: publicUser(user) });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
 app.get("/api/auth/me", async (req, res) => {
   try {
     const user = await getUserFromRequest(req);
-    if (!user) return res.status(401).json({ error: "No autenticado" });
+    if (!user) return sendError(res, 401, "NOT_AUTHENTICATED");
     res.json({ success: true, user: publicUser(user) });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
@@ -548,7 +557,7 @@ app.post("/api/auth/logout", async (req, res) => {
     await deleteSession(token);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
@@ -559,7 +568,7 @@ app.get("/api/v1/users", requireAdmin, async (req, res) => {
     const users = await loadUsers();
     res.json({ success: true, data: users.map(publicUser) });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
@@ -568,11 +577,11 @@ app.post("/api/v1/users", requireAdmin, async (req, res) => {
     const admin = (await getUserFromRequest(req))!;
     const { name, email, password, role } = req.body || {};
     if (!name || !email || !password) {
-      return res.status(400).json({ error: "Nombre, email y contraseña son obligatorios" });
+      return sendError(res, 400, "PROFILE_MISSING_FIELDS");
     }
     const users = await loadUsers();
     if (users.some((u) => u.email === email)) {
-      return res.status(409).json({ error: "Ya existe un perfil con ese email" });
+      return sendError(res, 409, "PROFILE_EMAIL_EXISTS");
     }
     const newUser: UserRecord = {
       id: "user-" + Date.now(),
@@ -586,7 +595,7 @@ app.post("/api/v1/users", requireAdmin, async (req, res) => {
     await createUser(newUser);
     res.json({ success: true, data: publicUser(newUser) });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
@@ -594,19 +603,19 @@ app.delete("/api/v1/users/:id", requireAdmin, async (req, res) => {
   try {
     const admin = (await getUserFromRequest(req))!;
     if (req.params.id === admin.id) {
-      return res.status(400).json({ error: "No puedes eliminar tu propio perfil" });
+      return sendError(res, 400, "CANNOT_DELETE_SELF");
     }
     const users = await loadUsers();
     const target = users.find((u) => u.id === req.params.id);
-    if (!target) return res.status(404).json({ error: "Perfil no encontrado" });
+    if (!target) return sendError(res, 404, "PROFILE_NOT_FOUND");
     const remainingAdmins = users.filter((u) => u.role === "admin" && u.id !== target.id);
     if (target.role === "admin" && remainingAdmins.length === 0) {
-      return res.status(400).json({ error: "Debe existir al menos un perfil administrador" });
+      return sendError(res, 400, "LAST_ADMIN_REQUIRED");
     }
     await deleteUser(req.params.id);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
@@ -618,7 +627,8 @@ app.get("/api/health", async (req, res) => {
     const nodes = await loadNodes();
     res.json({ status: "ok", timestamp: new Date().toISOString(), totalNodes: nodes.length, persistence: supabase ? "supabase" : "in-memory" });
   } catch (err: any) {
-    res.status(500).json({ status: "error", error: err.message });
+    console.error(err);
+    res.status(500).json({ status: "error", error: "SERVER_ERROR" satisfies ErrorCode });
   }
 });
 
@@ -640,7 +650,7 @@ app.get("/api/v1/nodes", async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
@@ -648,7 +658,7 @@ app.get("/api/v1/nodes", async (req, res) => {
 app.post("/api/v1/nodes/bulk-sync", requireAdmin, async (req, res) => {
   const { nodes } = req.body;
   if (!Array.isArray(nodes)) {
-    return res.status(400).json({ error: "Formato de nodos inválido" });
+    return sendError(res, 400, "INVALID_NODES_FORMAT");
   }
   try {
     await saveNodes(nodes);
@@ -662,7 +672,7 @@ app.post("/api/v1/nodes/bulk-sync", requireAdmin, async (req, res) => {
     });
     return res.json({ success: true, count: nodes.length });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    return sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
@@ -672,30 +682,30 @@ app.get("/api/v1/work-centers", async (req, res) => {
     const centers = await loadWorkCenters();
     res.json({ success: true, data: centers });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
 app.post("/api/v1/work-centers", requireAdmin, async (req, res) => {
   const name = (req.body?.name || "").trim();
-  if (!name) return res.status(400).json({ error: "El nombre del centro de trabajo es obligatorio" });
+  if (!name) return sendError(res, 400, "WORK_CENTER_NAME_REQUIRED");
   try {
     await addWorkCenter(name);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
 app.put("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
   const oldName = decodeURIComponent(req.params.name);
   const newName = (req.body?.name || "").trim();
-  if (!newName) return res.status(400).json({ error: "El nuevo nombre es obligatorio" });
+  if (!newName) return sendError(res, 400, "NEW_NAME_REQUIRED");
   try {
     await renameWorkCenterEntry(oldName, newName);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
@@ -719,7 +729,7 @@ app.patch("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
     }
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
@@ -729,7 +739,7 @@ app.delete("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
     await deleteWorkCenterEntry(name);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
@@ -740,7 +750,7 @@ app.post("/api/v1/hr/sync", requireAdmin, async (req, res) => {
   const targetSede = (req.body.targetSede || "").trim();
 
   if (!targetSede) {
-    return res.status(400).json({ error: "Debes indicar el centro de trabajo (targetSede) que recibirá la sincronización" });
+    return sendError(res, 400, "TARGET_SEDE_REQUIRED");
   }
 
   if (incomingEmployees.length > 0) {
@@ -798,7 +808,7 @@ app.post("/api/v1/hr/sync", requireAdmin, async (req, res) => {
         currentTotalNodes: nextNodes.length
       });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return sendError(res, 500, "SERVER_ERROR", err);
     }
   }
 
@@ -829,7 +839,7 @@ app.get("/api/v1/integrations/keys", async (req, res) => {
     const keys = await loadApiKeys();
     res.json({ success: true, data: keys });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
@@ -847,7 +857,7 @@ app.post("/api/v1/integrations/keys", requireAdmin, async (req, res) => {
     await createApiKey(newKey);
     res.json({ success: true, data: newKey });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
@@ -856,7 +866,7 @@ app.get("/api/v1/integrations/logs", async (req, res) => {
     const logs = await loadSyncLogs();
     res.json({ success: true, data: logs });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, "SERVER_ERROR", err);
   }
 });
 
@@ -919,17 +929,15 @@ app.post("/api/ai/generate-org", async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!targetSede) {
-      return res.status(400).json({ error: "Debes indicar el centro de trabajo (targetSede) para el que se generará el organigrama" });
+      return sendError(res, 400, "AI_TARGET_SEDE_REQUIRED");
     }
 
     if (image && (!image.mimeType || !image.data)) {
-      return res.status(400).json({ error: "El archivo adjunto es inválido" });
+      return sendError(res, 400, "AI_INVALID_ATTACHMENT");
     }
 
     if (!apiKey) {
-      return res.status(400).json({
-        error: "GEMINI_API_KEY no configurada. Agrega la clave en el panel de Configuración."
-      });
+      return sendError(res, 400, "AI_NOT_CONFIGURED");
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -1034,10 +1042,9 @@ ${
       return res.json({ success: true, nodes: nodesWithCoords });
     }
 
-    return res.status(500).json({ error: "No se pudo formatear la respuesta del modelo AI." });
+    return sendError(res, 500, "AI_RESPONSE_FORMAT_ERROR");
   } catch (err: any) {
-    console.error("AI Generation error:", err);
-    return res.status(500).json({ error: err.message || "Error al comunicarse con la IA de Gemini" });
+    return sendError(res, 500, "AI_COMMUNICATION_ERROR", err);
   }
 });
 

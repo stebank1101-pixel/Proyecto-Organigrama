@@ -527,7 +527,17 @@ export const TreeView = forwardRef<HTMLDivElement, TreeViewProps>(function TreeV
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
       >
-      {logo && <img src={logo} alt="" className="pointer-events-none absolute left-6 top-6 max-h-16 max-w-[200px] object-contain" />}
+      {/* data-export-hide: the exported PNG/PDF already gets this logo drawn into its own
+          corporate header band (see exportFrame.ts) — without hiding it here too, it'd show
+          up twice, once from the header and once baked into the captured canvas. */}
+      {logo && (
+        <img
+          data-export-hide="true"
+          src={logo}
+          alt=""
+          className="pointer-events-none absolute left-6 top-6 max-h-16 max-w-[200px] object-contain"
+        />
+      )}
       <svg className="pointer-events-none absolute inset-0" width={bounds.width} height={bounds.height}>
         {nodes.map((node) => {
           if (!node.parentId) return null;

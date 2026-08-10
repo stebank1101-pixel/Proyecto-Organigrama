@@ -13,6 +13,7 @@ import {
   fetchNodes,
   fetchWorkCenters,
   renameWorkCenterApi,
+  translateApiError,
   updateWorkCenterProfileApi,
 } from "./lib/api";
 import { useAuth } from "./lib/auth";
@@ -104,7 +105,7 @@ export default function App() {
       setNodes(res.data);
       setDirty(false);
     } catch (err) {
-      if (!silent) setLoadError(err instanceof Error ? err.message : t.app.loadOrgError);
+      if (!silent) setLoadError(translateApiError(err, t, t.app.loadOrgError));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -118,7 +119,7 @@ export default function App() {
     if (!user && !isGuest) return;
     fetchWorkCenters()
       .then((res) => setWorkCenters(res.data))
-      .catch((err) => setCenterError(err instanceof Error ? err.message : t.app.loadCentersError));
+      .catch((err) => setCenterError(translateApiError(err, t, t.app.loadCentersError)));
   }, [user, isGuest]);
 
   useEffect(() => {
@@ -262,7 +263,7 @@ export default function App() {
       setDirty(false);
       pushToast(t.app.orgSynced);
     } catch (err) {
-      pushToast(err instanceof Error ? err.message : t.app.saveError, "error");
+      pushToast(translateApiError(err, t, t.app.saveError), "error");
     } finally {
       setSaving(false);
     }
@@ -282,7 +283,7 @@ export default function App() {
       );
       return true;
     } catch (err) {
-      setCenterError(err instanceof Error ? err.message : t.app.createCenterError);
+      setCenterError(translateApiError(err, t, t.app.createCenterError));
       return false;
     }
   }
@@ -301,7 +302,7 @@ export default function App() {
       });
       return true;
     } catch (err) {
-      setCenterError(err instanceof Error ? err.message : t.app.renameCenterError);
+      setCenterError(translateApiError(err, t, t.app.renameCenterError));
       return false;
     }
   }
@@ -316,7 +317,7 @@ export default function App() {
       setWorkCenters((prev) => prev.filter((c) => c.name !== name));
       return true;
     } catch (err) {
-      setCenterError(err instanceof Error ? err.message : t.app.deleteCenterError);
+      setCenterError(translateApiError(err, t, t.app.deleteCenterError));
       return false;
     }
   }
@@ -332,7 +333,7 @@ export default function App() {
       });
       return true;
     } catch (err) {
-      setCenterError(err instanceof Error ? err.message : t.app.updateCenterError);
+      setCenterError(translateApiError(err, t, t.app.updateCenterError));
       return false;
     }
   }
@@ -352,7 +353,7 @@ export default function App() {
       });
       return true;
     } catch (err) {
-      setCenterError(err instanceof Error ? err.message : t.app.updateCenterError);
+      setCenterError(translateApiError(err, t, t.app.updateCenterError));
       return false;
     }
   }

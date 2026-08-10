@@ -1,7 +1,7 @@
 import { Loader2, Shield, Trash2, User, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../lib/auth";
-import { createUserProfile, deleteUserProfile, fetchUsers } from "../lib/api";
+import { createUserProfile, deleteUserProfile, fetchUsers, translateApiError } from "../lib/api";
 import { useT } from "../lib/i18n";
 import type { UserProfile } from "../types";
 
@@ -37,7 +37,7 @@ export function ProfilesView() {
       setForm({ name: "", email: "", password: "", role: "viewer" });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.profiles.createError);
+      setError(translateApiError(err, t, t.profiles.createError));
     } finally {
       setCreating(false);
     }
@@ -49,7 +49,7 @@ export function ProfilesView() {
       await deleteUserProfile(id);
       await refresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : t.profiles.deleteError);
+      alert(translateApiError(err, t, t.profiles.deleteError));
     }
   }
 

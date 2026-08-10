@@ -1,6 +1,6 @@
 import { Loader2, PlusCircle, RefreshCw, Sparkles, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
-import { generateAiOrg } from "../lib/api";
+import { generateAiOrg, translateApiError } from "../lib/api";
 import { useT } from "../lib/i18n";
 import { OrgIcon } from "../lib/icons";
 import { computeAllSedes } from "../lib/workCenters";
@@ -71,7 +71,7 @@ export function AiGeneratorView({ nodes, workCenters, onApply, readOnly }: AiGen
       const res = await generateAiOrg({ prompt, companyType, headcount, targetSede, image });
       setPreview(res.nodes || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.aiGenerator.generateError);
+      setError(translateApiError(err, t, t.aiGenerator.generateError));
     } finally {
       setLoading(false);
     }

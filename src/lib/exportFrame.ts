@@ -79,17 +79,18 @@ export async function composeChartWithHeader(
   const logoY = (headerHeight - logoHeight) / 2 - headerHeight * 0.08;
   ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
 
-  // Title pill with the active work center's name.
+  // Title pill with the active work center's name, centered in the space to the right of the logo.
   const pillText = title.toUpperCase();
   const pillFontSize = Math.round(headerHeight * 0.22);
   ctx.font = `700 ${pillFontSize}px Arial, Helvetica, sans-serif`;
   const textWidth = ctx.measureText(pillText).width;
   const pillPaddingX = headerHeight * 0.35;
-  const pillX = logoX + logoWidth + headerHeight * 0.6;
   const pillHeight = headerHeight * 0.42;
   const pillY = headerHeight * 0.18;
-  const maxPillWidth = Math.max(headerHeight * 2, width - pillX - headerHeight * 0.5);
-  const pillWidth = Math.min(maxPillWidth, textWidth + pillPaddingX * 2);
+  const titleAreaX = logoX + logoWidth + headerHeight * 0.6;
+  const titleAreaWidth = Math.max(headerHeight * 2, width - titleAreaX - headerHeight * 0.5);
+  const pillWidth = Math.min(titleAreaWidth, textWidth + pillPaddingX * 2);
+  const pillX = titleAreaX + (titleAreaWidth - pillWidth) / 2;
   roundedRectPath(ctx, pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
   ctx.fillStyle = NAVY;
   ctx.fill();
@@ -98,11 +99,11 @@ export async function composeChartWithHeader(
   ctx.textAlign = "center";
   ctx.fillText(pillText, pillX + pillWidth / 2, pillY + pillHeight / 2 + 1, pillWidth - pillPaddingX);
 
-  // Company name under the pill.
+  // Company name under the pill, centered on the same axis as the pill.
   ctx.font = `700 ${Math.round(headerHeight * 0.13)}px Arial, Helvetica, sans-serif`;
   ctx.fillStyle = NAVY;
-  ctx.textAlign = "left";
-  ctx.fillText("CHINA HARBOUR ENGINEERING COMPANY LTD.", pillX, pillY + pillHeight + headerHeight * 0.22);
+  ctx.textAlign = "center";
+  ctx.fillText("CHINA HARBOUR ENGINEERING COMPANY LTD.", pillX + pillWidth / 2, pillY + pillHeight + headerHeight * 0.22);
 
   // Divider between the header and the chart.
   ctx.strokeStyle = BLUE;

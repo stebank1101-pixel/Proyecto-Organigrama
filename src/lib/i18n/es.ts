@@ -1,5 +1,29 @@
+import type { ErrorCode } from "../errorCodes";
+
 export const es = {
   common: {
+    errors: {
+      SESSION_EXPIRED: "Sesión inválida o expirada. Inicia sesión nuevamente.",
+      ADMIN_ONLY: "Solo los perfiles de administrador pueden modificar el organigrama.",
+      INVALID_CREDENTIALS: "Email o contraseña incorrectos",
+      NOT_AUTHENTICATED: "No autenticado",
+      PROFILE_MISSING_FIELDS: "Nombre, email y contraseña son obligatorios",
+      PROFILE_EMAIL_EXISTS: "Ya existe un perfil con ese email",
+      CANNOT_DELETE_SELF: "No puedes eliminar tu propio perfil",
+      PROFILE_NOT_FOUND: "Perfil no encontrado",
+      LAST_ADMIN_REQUIRED: "Debe existir al menos un perfil administrador",
+      INVALID_NODES_FORMAT: "Formato de nodos inválido",
+      WORK_CENTER_NAME_REQUIRED: "El nombre del centro de trabajo es obligatorio",
+      NEW_NAME_REQUIRED: "El nuevo nombre es obligatorio",
+      TARGET_SEDE_REQUIRED: "Debes indicar el centro de trabajo que recibirá la sincronización",
+      AI_TARGET_SEDE_REQUIRED: "Debes indicar el centro de trabajo para el que se generará el organigrama",
+      AI_INVALID_ATTACHMENT: "El archivo adjunto es inválido",
+      AI_NOT_CONFIGURED: "GEMINI_API_KEY no configurada. Agrega la clave en el panel de Configuración.",
+      AI_RESPONSE_FORMAT_ERROR: "No se pudo formatear la respuesta del modelo AI.",
+      AI_COMMUNICATION_ERROR: "Error al comunicarse con la IA de Gemini",
+      NETWORK_ERROR: "No se pudo conectar con el servidor. Revisa tu conexión.",
+      SERVER_ERROR: "Ha ocurrido un error en el servidor. Inténtalo de nuevo.",
+    } satisfies Record<ErrorCode, string>,
     cancel: "Cancelar",
     save: "Guardar",
     delete: "Eliminar",
@@ -40,6 +64,7 @@ export const es = {
   },
   login: {
     genericError: "No se pudo iniciar sesión",
+    logoAlt: "Logo CHEC",
     brandTitle: "ORGANIGRAMA CHEC-COLOMBIA",
     viewOrgCharts: "Ver organigramas",
     guestAccessDescription: "Acceso de invitado: consulta los organigramas de todos los centros de trabajo en modo solo lectura.",
@@ -146,6 +171,7 @@ export const es = {
     textColor: "Color de texto",
     reset: "Restablecer",
     fontType: "Tipo de letra",
+    fontDefault: "Predeterminada (Inter)",
     iconLogo: "Icono / logo corporativo",
     imageUrlPlaceholder: "URL de imagen (https://...)",
     uploadImageTitle: "Subir imagen",
@@ -234,6 +260,7 @@ export const es = {
     refreshTitle: "Refrescar",
     noLogs: "Aún no hay registros de sincronización.",
     syncError: "Error al sincronizar",
+    syncSuccess: (count: number, provider: string) => `Sincronización completada exitosamente desde ${provider} (${count} registros).`,
     defaultProvider: "API Personalizada",
   },
   aiGenerator: {
