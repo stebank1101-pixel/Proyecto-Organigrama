@@ -114,11 +114,6 @@ export function LoginView() {
                 {loading ? t.login.loggingIn : t.login.signIn}
               </button>
             </form>
-
-            <p className="mt-4 text-center text-[11px] text-slate-400">
-              {t.login.testProfile} <span className="font-medium text-slate-500">admin@empresa.com</span> /{" "}
-              <span className="font-medium text-slate-500">admin123</span>
-            </p>
           </>
         )}
       </div>
