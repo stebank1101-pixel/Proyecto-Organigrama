@@ -111,3 +111,18 @@ create table if not exists public.directory_contacts (
   created_at timestamptz not null default now()
 );
 alter table public.directory_contacts disable row level security;
+
+-- ============================================================
+-- 5) platform_credentials: "Usuarios CHEC" third-party platform logins
+-- ============================================================
+create table if not exists public.platform_credentials (
+  id text primary key,
+  empresa text not null default '',
+  tipo_id text not null default '',
+  usuario text not null default '',
+  clave text not null default '',
+  objetivo text not null default '',
+  link text not null default '',
+  created_at timestamptz not null default now()
+);
+alter table public.platform_credentials disable row level security;

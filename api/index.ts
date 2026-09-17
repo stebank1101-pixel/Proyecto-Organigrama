@@ -352,6 +352,83 @@ async function deleteDirectoryContactEntry(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+// Platform credentials ("Usuarios CHEC" — the internal reference sheet of logins for
+// third-party government/health/payroll platforms) persist in Supabase (table
+// "platform_credentials") when configured, or an in-memory list otherwise. Reads require
+// requireAuth (not requireAdmin) — any logged-in profile can consult them, but unlike the
+// phone directory this is never exposed to guest mode since it holds real passwords.
+interface PlatformCredentialRecord {
+  id: string;
+  empresa: string;
+  tipoId: string;
+  usuario: string;
+  clave: string;
+  objetivo: string;
+  link: string;
+}
+
+let inMemoryCredentials: PlatformCredentialRecord[] = [];
+
+async function loadCredentials(): Promise<PlatformCredentialRecord[]> {
+  if (!supabase) return inMemoryCredentials;
+  const { data, error } = await supabase.from("platform_credentials").select("*").order("created_at");
+  if (error) throw new Error(error.message);
+  return data.map((row: any) => ({
+    id: row.id,
+    empresa: row.empresa || "",
+    tipoId: row.tipo_id || "",
+    usuario: row.usuario || "",
+    clave: row.clave || "",
+    objetivo: row.objetivo || "",
+    link: row.link || ""
+  }));
+}
+
+async function insertCredential(credential: PlatformCredentialRecord): Promise<void> {
+  if (!supabase) {
+    inMemoryCredentials.push(credential);
+    return;
+  }
+  const { error } = await supabase.from("platform_credentials").insert({
+    id: credential.id,
+    empresa: credential.empresa,
+    tipo_id: credential.tipoId,
+    usuario: credential.usuario,
+    clave: credential.clave,
+    objetivo: credential.objetivo,
+    link: credential.link
+  });
+  if (error) throw new Error(error.message);
+}
+
+async function updateCredentialEntry(id: string, patch: Omit<PlatformCredentialRecord, "id">): Promise<void> {
+  if (!supabase) {
+    inMemoryCredentials = inMemoryCredentials.map((c) => (c.id === id ? { ...c, ...patch } : c));
+    return;
+  }
+  const { error } = await supabase
+    .from("platform_credentials")
+    .update({
+      empresa: patch.empresa,
+      tipo_id: patch.tipoId,
+      usuario: patch.usuario,
+      clave: patch.clave,
+      objetivo: patch.objetivo,
+      link: patch.link
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+async function deleteCredentialEntry(id: string): Promise<void> {
+  if (!supabase) {
+    inMemoryCredentials = inMemoryCredentials.filter((c) => c.id !== id);
+    return;
+  }
+  const { error } = await supabase.from("platform_credentials").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // User profiles (auth), sessions, integration API keys and sync logs persist in Supabase
 // (tables "app_users", "sessions", "api_keys", "sync_logs") when configured; otherwise they
 // fall back to these in-memory stores, which do NOT survive a process restart or, in
@@ -571,6 +648,21 @@ async function requireAdmin(req: express.Request, res: express.Response, next: e
     }
     if (user.role !== "admin") {
       return sendError(res, 403, "ADMIN_ONLY");
+    }
+    next();
+  } catch (err: any) {
+    sendError(res, 500, "SERVER_ERROR", err);
+  }
+}
+
+// Unlike requireAdmin, accepts any logged-in profile (admin or viewer) — just blocks guests
+// (who never hold a session token). Used for data too sensitive to expose in guest mode
+// (e.g. real third-party platform passwords) but that viewers still need day to day.
+async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  try {
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      return sendError(res, 401, "SESSION_EXPIRED");
     }
     next();
   } catch (err: any) {
@@ -860,6 +952,73 @@ app.put("/api/v1/directory/:id", requireAdmin, async (req, res) => {
 app.delete("/api/v1/directory/:id", requireAdmin, async (req, res) => {
   try {
     await deleteDirectoryContactEntry(req.params.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    sendError(res, 500, "SERVER_ERROR", err);
+  }
+});
+
+// Platform credentials ("Usuarios CHEC") management. Reads require any logged-in session
+// (requireAuth) — never exposed to guest mode, unlike the phone directory, since this holds
+// real passwords to third-party platforms. Writes require an admin session.
+app.get("/api/v1/credentials", requireAuth, async (req, res) => {
+  try {
+    const credentials = await loadCredentials();
+    res.json({ success: true, data: credentials });
+  } catch (err: any) {
+    sendError(res, 500, "SERVER_ERROR", err);
+  }
+});
+
+app.post("/api/v1/credentials", requireAdmin, async (req, res) => {
+  const empresa = String(req.body?.empresa || "").trim();
+  if (!empresa) {
+    return sendError(res, 400, "CREDENTIAL_MISSING_FIELDS");
+  }
+  try {
+    const credential: PlatformCredentialRecord = {
+      id: "credential-" + Date.now(),
+      empresa,
+      tipoId: String(req.body?.tipoId || "").trim(),
+      usuario: String(req.body?.usuario || "").trim(),
+      clave: String(req.body?.clave || "").trim(),
+      objetivo: String(req.body?.objetivo || "").trim(),
+      link: String(req.body?.link || "").trim()
+    };
+    await insertCredential(credential);
+    res.json({ success: true, data: credential });
+  } catch (err: any) {
+    sendError(res, 500, "SERVER_ERROR", err);
+  }
+});
+
+app.put("/api/v1/credentials/:id", requireAdmin, async (req, res) => {
+  const empresa = String(req.body?.empresa || "").trim();
+  if (!empresa) {
+    return sendError(res, 400, "CREDENTIAL_MISSING_FIELDS");
+  }
+  try {
+    const credentials = await loadCredentials();
+    if (!credentials.some((c) => c.id === req.params.id)) {
+      return sendError(res, 404, "CREDENTIAL_NOT_FOUND");
+    }
+    await updateCredentialEntry(req.params.id, {
+      empresa,
+      tipoId: String(req.body?.tipoId || "").trim(),
+      usuario: String(req.body?.usuario || "").trim(),
+      clave: String(req.body?.clave || "").trim(),
+      objetivo: String(req.body?.objetivo || "").trim(),
+      link: String(req.body?.link || "").trim()
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    sendError(res, 500, "SERVER_ERROR", err);
+  }
+});
+
+app.delete("/api/v1/credentials/:id", requireAdmin, async (req, res) => {
+  try {
+    await deleteCredentialEntry(req.params.id);
     res.json({ success: true });
   } catch (err: any) {
     sendError(res, 500, "SERVER_ERROR", err);

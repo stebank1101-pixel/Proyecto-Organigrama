@@ -1,4 +1,4 @@
-import type { ApiKeyRecord, DirectoryContact, OrgNode, SyncLogRecord, UserProfile, WorkCenter } from "../types";
+import type { ApiKeyRecord, DirectoryContact, OrgNode, PlatformCredential, SyncLogRecord, UserProfile, WorkCenter } from "../types";
 import { ERROR_CODES, type ErrorCode } from "./errorCodes";
 import type { Dictionary } from "./i18n";
 
@@ -169,6 +169,38 @@ export function updateDirectoryContactApi(
 
 export function deleteDirectoryContactApi(id: string): Promise<{ success: boolean }> {
   return request(`/api/v1/directory/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function fetchCredentials(): Promise<{ success: boolean; data: PlatformCredential[] }> {
+  return request("/api/v1/credentials");
+}
+
+export function createCredentialApi(payload: {
+  empresa: string;
+  tipoId: string;
+  usuario: string;
+  clave: string;
+  objetivo: string;
+  link: string;
+}): Promise<{ success: boolean; data: PlatformCredential }> {
+  return request("/api/v1/credentials", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateCredentialApi(
+  id: string,
+  payload: { empresa: string; tipoId: string; usuario: string; clave: string; objetivo: string; link: string }
+): Promise<{ success: boolean }> {
+  return request(`/api/v1/credentials/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteCredentialApi(id: string): Promise<{ success: boolean }> {
+  return request(`/api/v1/credentials/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export function fetchApiKeys(): Promise<{ data: ApiKeyRecord[] }> {

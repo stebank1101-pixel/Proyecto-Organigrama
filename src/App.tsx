@@ -7,6 +7,7 @@ import { LoginView } from "./components/LoginView";
 import { NavBar } from "./components/NavBar";
 import { OrgChartView } from "./components/OrgChartView";
 import { ProfilesView } from "./components/ProfilesView";
+import { UsersChecView } from "./components/UsersChecView";
 import {
   bulkSyncNodes,
   createWorkCenterApi,
@@ -125,7 +126,7 @@ export default function App() {
 
   useEffect(() => {
     if (!isAdmin && activeTab === "profiles") setActiveTab("chart");
-    if (isGuest && (activeTab === "ai" || activeTab === "hr")) setActiveTab("chart");
+    if (isGuest && (activeTab === "ai" || activeTab === "hr" || activeTab === "credentials")) setActiveTab("chart");
   }, [isAdmin, isGuest, activeTab]);
 
   function handleAddNode(node: OrgNode) {
@@ -421,6 +422,8 @@ export default function App() {
           <HrIntegrationView nodes={nodes} workCenters={workCenters} onSynced={handleHrSynced} readOnly={!isAdmin} />
         ) : activeTab === "directory" ? (
           <DirectoryView workCenters={workCenters} readOnly={!isAdmin} />
+        ) : activeTab === "credentials" ? (
+          <UsersChecView readOnly={!isAdmin} />
         ) : (
           <ProfilesView />
         )}

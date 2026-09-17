@@ -116,7 +116,7 @@ export interface SyncLogRecord {
   nodesUpdated: number;
 }
 
-export type TabId = "chart" | "ai" | "hr" | "profiles" | "directory";
+export type TabId = "chart" | "ai" | "hr" | "profiles" | "directory" | "credentials";
 
 export interface DirectoryContact {
   id: string;
@@ -125,6 +125,16 @@ export interface DirectoryContact {
   name: string;
   phone: string;
   email: string;
+}
+
+export interface PlatformCredential {
+  id: string;
+  empresa: string;
+  tipoId: string;
+  usuario: string;
+  clave: string;
+  objetivo: string;
+  link: string;
 }
 
 export type UserRole = "admin" | "viewer";
