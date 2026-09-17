@@ -185,7 +185,7 @@ export function DirectoryView({ workCenters, readOnly }: DirectoryViewProps) {
           {contacts.length === 0 ? t.directory.noContacts : t.directory.noContactsFiltered}
         </p>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex-shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           {filteredGroups.map(([sede, list]) => (
             <div key={sede || "__none__"} className="border-b border-slate-100 last:border-b-0">
               <div className="bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">{sede || t.directory.noValue}</div>
