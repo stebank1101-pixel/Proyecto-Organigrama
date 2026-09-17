@@ -116,7 +116,16 @@ export interface SyncLogRecord {
   nodesUpdated: number;
 }
 
-export type TabId = "chart" | "ai" | "hr" | "profiles";
+export type TabId = "chart" | "ai" | "hr" | "profiles" | "directory";
+
+export interface DirectoryContact {
+  id: string;
+  sede: string;
+  area: string;
+  name: string;
+  phone: string;
+  email: string;
+}
 
 export type UserRole = "admin" | "viewer";
 

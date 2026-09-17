@@ -296,6 +296,62 @@ async function setDefaultWorkCenter(name: string, isDefault: boolean): Promise<v
   await updateWorkCenterProfile(name, { isDefault });
 }
 
+// Phone directory ("Directorio telefónico") contacts persist in Supabase (table
+// "directory_contacts") when configured, or an in-memory list otherwise — same fallback
+// pattern as work centers. Unlike org_nodes, a contact isn't tied to any hierarchy, so it's
+// just a flat list grouped by "sede" / "area" on the client.
+interface DirectoryContactRecord {
+  id: string;
+  sede: string;
+  area: string;
+  name: string;
+  phone: string;
+  email: string;
+}
+
+let inMemoryDirectory: DirectoryContactRecord[] = [];
+
+async function loadDirectory(): Promise<DirectoryContactRecord[]> {
+  if (!supabase) return inMemoryDirectory;
+  const { data, error } = await supabase.from("directory_contacts").select("*").order("sede").order("area");
+  if (error) throw new Error(error.message);
+  return data.map((row: any) => ({
+    id: row.id,
+    sede: row.sede || "",
+    area: row.area || "",
+    name: row.name || "",
+    phone: row.phone || "",
+    email: row.email || ""
+  }));
+}
+
+async function insertDirectoryContact(contact: DirectoryContactRecord): Promise<void> {
+  if (!supabase) {
+    inMemoryDirectory.push(contact);
+    return;
+  }
+  const { error } = await supabase.from("directory_contacts").insert(contact);
+  if (error) throw new Error(error.message);
+}
+
+async function updateDirectoryContactEntry(id: string, patch: Omit<DirectoryContactRecord, "id">): Promise<void> {
+  if (!supabase) {
+    inMemoryDirectory = inMemoryDirectory.map((c) => (c.id === id ? { ...c, ...patch } : c));
+    return;
+  }
+  const { error } = await supabase.from("directory_contacts").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+async function deleteDirectoryContactEntry(id: string): Promise<void> {
+  if (!supabase) {
+    inMemoryDirectory = inMemoryDirectory.filter((c) => c.id !== id);
+    return;
+  }
+  const { error } = await supabase.from("directory_contacts").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // User profiles (auth), sessions, integration API keys and sync logs persist in Supabase
 // (tables "app_users", "sessions", "api_keys", "sync_logs") when configured; otherwise they
 // fall back to these in-memory stores, which do NOT survive a process restart or, in
@@ -737,6 +793,73 @@ app.delete("/api/v1/work-centers/:name", requireAdmin, async (req, res) => {
   const name = decodeURIComponent(req.params.name);
   try {
     await deleteWorkCenterEntry(name);
+    res.json({ success: true });
+  } catch (err: any) {
+    sendError(res, 500, "SERVER_ERROR", err);
+  }
+});
+
+// Phone directory ("Directorio telefónico") management. Reads are public (same as
+// /api/v1/nodes and /api/v1/work-centers) so guests/viewers can consult it; writes require
+// an admin session.
+app.get("/api/v1/directory", async (req, res) => {
+  try {
+    const contacts = await loadDirectory();
+    res.json({ success: true, data: contacts });
+  } catch (err: any) {
+    sendError(res, 500, "SERVER_ERROR", err);
+  }
+});
+
+app.post("/api/v1/directory", requireAdmin, async (req, res) => {
+  const sede = String(req.body?.sede || "").trim();
+  const name = String(req.body?.name || "").trim();
+  if (!sede || !name) {
+    return sendError(res, 400, "DIRECTORY_MISSING_FIELDS");
+  }
+  try {
+    const contact: DirectoryContactRecord = {
+      id: "contact-" + Date.now(),
+      sede,
+      area: String(req.body?.area || "").trim(),
+      name,
+      phone: String(req.body?.phone || "").trim(),
+      email: String(req.body?.email || "").trim()
+    };
+    await insertDirectoryContact(contact);
+    res.json({ success: true, data: contact });
+  } catch (err: any) {
+    sendError(res, 500, "SERVER_ERROR", err);
+  }
+});
+
+app.put("/api/v1/directory/:id", requireAdmin, async (req, res) => {
+  const sede = String(req.body?.sede || "").trim();
+  const name = String(req.body?.name || "").trim();
+  if (!sede || !name) {
+    return sendError(res, 400, "DIRECTORY_MISSING_FIELDS");
+  }
+  try {
+    const contacts = await loadDirectory();
+    if (!contacts.some((c) => c.id === req.params.id)) {
+      return sendError(res, 404, "DIRECTORY_NOT_FOUND");
+    }
+    await updateDirectoryContactEntry(req.params.id, {
+      sede,
+      area: String(req.body?.area || "").trim(),
+      name,
+      phone: String(req.body?.phone || "").trim(),
+      email: String(req.body?.email || "").trim()
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    sendError(res, 500, "SERVER_ERROR", err);
+  }
+});
+
+app.delete("/api/v1/directory/:id", requireAdmin, async (req, res) => {
+  try {
+    await deleteDirectoryContactEntry(req.params.id);
     res.json({ success: true });
   } catch (err: any) {
     sendError(res, 500, "SERVER_ERROR", err);

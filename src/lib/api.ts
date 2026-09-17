@@ -1,4 +1,4 @@
-import type { ApiKeyRecord, OrgNode, SyncLogRecord, UserProfile, WorkCenter } from "../types";
+import type { ApiKeyRecord, DirectoryContact, OrgNode, SyncLogRecord, UserProfile, WorkCenter } from "../types";
 import { ERROR_CODES, type ErrorCode } from "./errorCodes";
 import type { Dictionary } from "./i18n";
 
@@ -138,6 +138,37 @@ export function updateWorkCenterProfileApi(
 
 export function deleteWorkCenterApi(name: string): Promise<{ success: boolean }> {
   return request(`/api/v1/work-centers/${encodeURIComponent(name)}`, { method: "DELETE" });
+}
+
+export function fetchDirectoryContacts(): Promise<{ success: boolean; data: DirectoryContact[] }> {
+  return request("/api/v1/directory");
+}
+
+export function createDirectoryContactApi(payload: {
+  sede: string;
+  area: string;
+  name: string;
+  phone: string;
+  email: string;
+}): Promise<{ success: boolean; data: DirectoryContact }> {
+  return request("/api/v1/directory", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateDirectoryContactApi(
+  id: string,
+  payload: { sede: string; area: string; name: string; phone: string; email: string }
+): Promise<{ success: boolean }> {
+  return request(`/api/v1/directory/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteDirectoryContactApi(id: string): Promise<{ success: boolean }> {
+  return request(`/api/v1/directory/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export function fetchApiKeys(): Promise<{ data: ApiKeyRecord[] }> {

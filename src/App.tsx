@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AiGeneratorView } from "./components/AiGeneratorView";
+import { DirectoryView } from "./components/DirectoryView";
 import { HrIntegrationView } from "./components/HrIntegrationView";
 import { LoginView } from "./components/LoginView";
 import { NavBar } from "./components/NavBar";
@@ -418,6 +419,8 @@ export default function App() {
           <AiGeneratorView nodes={nodes} workCenters={workCenters} onApply={handleApplyAiNodes} readOnly={!isAdmin} />
         ) : activeTab === "hr" ? (
           <HrIntegrationView nodes={nodes} workCenters={workCenters} onSynced={handleHrSynced} readOnly={!isAdmin} />
+        ) : activeTab === "directory" ? (
+          <DirectoryView workCenters={workCenters} readOnly={!isAdmin} />
         ) : (
           <ProfilesView />
         )}

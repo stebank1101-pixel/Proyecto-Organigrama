@@ -1,4 +1,4 @@
-import { Eye, Globe, LogIn, LogOut, Network, Plug, Shield, Sparkles, User, Users } from "lucide-react";
+import { Eye, Globe, LogIn, LogOut, Network, Phone, Plug, Shield, Sparkles, User, Users } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../lib/auth";
 import { LANGUAGE_LABELS, useLanguage, type Language } from "../lib/i18n";
@@ -19,6 +19,7 @@ export function NavBar({ active, onChange, nodeCount }: NavBarProps) {
     { id: "chart", label: t.nav.tabChart, icon: Network },
     { id: "ai", label: t.nav.tabAi, icon: Sparkles, hideForGuest: true },
     { id: "hr", label: t.nav.tabHr, icon: Plug, hideForGuest: true },
+    { id: "directory", label: t.nav.tabDirectory, icon: Phone },
     { id: "profiles", label: t.nav.tabProfiles, icon: Users, adminOnly: true },
   ];
 
